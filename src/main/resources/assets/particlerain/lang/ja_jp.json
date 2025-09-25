@@ -75,11 +75,11 @@
   "text.autoconfig.particlerain.option.fog.gravity": "重力",
   "text.autoconfig.particlerain.option.fog.size": "大きさ",
 
-  "text.autoconfig.particlerain.option.groundFog": "Ground Fog Particle Options",
-  "text.autoconfig.particlerain.option.groundFog.density": "Relative density",
-  "text.autoconfig.particlerain.option.groundFog.spawnHeight": "Spawn height",
-  "text.autoconfig.particlerain.option.groundFog.spawnTime": "Spawn time",
-  "text.autoconfig.particlerain.option.groundFog.size": "Size",
+  "text.autoconfig.particlerain.option.groundFog": "地表の霧パーティクルの設定",
+  "text.autoconfig.particlerain.option.groundFog.density": "相対的な密度",
+  "text.autoconfig.particlerain.option.groundFog.spawnHeight": "生成高さ",
+  "text.autoconfig.particlerain.option.groundFog.spawnTime": "生成時間",
+  "text.autoconfig.particlerain.option.groundFog.size": "大きさ",
 
   "text.autoconfig.particlerain.option.renderVanillaWeather.@PrefixText": "§l互換性設定",
   "text.autoconfig.particlerain.option.renderVanillaWeather": "デフォルトの天候を描画",
