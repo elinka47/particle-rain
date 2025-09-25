@@ -77,7 +77,7 @@
 
   "text.autoconfig.particlerain.option.groundFog": "地表の霧パーティクルの設定",
   "text.autoconfig.particlerain.option.groundFog.density": "相対的な密度",
-  "text.autoconfig.particlerain.option.groundFog.spawnHeight": "生成高さ",
+  "text.autoconfig.particlerain.option.groundFog.spawnHeight": "生成される高さ",
   "text.autoconfig.particlerain.option.groundFog.spawnTime": "生成時間",
   "text.autoconfig.particlerain.option.groundFog.size": "大きさ",
 
