@@ -92,5 +92,5 @@
   "text.autoconfig.particlerain.option.alwaysRaining": "常に天候パーティクルを生成",
   "text.autoconfig.particlerain.option.yLevelWindAdjustment": "高度による風の補正",
   "text.autoconfig.particlerain.option.syncRegistry": "レジストリを同期",
-  "text.autoconfig.particlerain.option.syncRegistry.@Tooltip": "プレイヤーがLANサーバーに接続できない場合は無効にしてください",
+  "text.autoconfig.particlerain.option.syncRegistry.@Tooltip": "プレイヤーがLANサーバーに接続できない場合は無効にしてください"
 }
