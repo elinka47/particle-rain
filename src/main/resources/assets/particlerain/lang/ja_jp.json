@@ -13,7 +13,7 @@
   "text.autoconfig.particlerain.option.particleRadius.@Tooltip": "カメラから何ブロック離れた場所にパーティクルが生成されるかどうか",
 
   "text.autoconfig.particlerain.option.doRainParticles.@PrefixText": "§l個別エフェクトの有効／無効",
-  "text.autoconfig.particlerain.option.doRainParticles": "雨のパーティクルを生成",
+  "text.autoconfig.particlerain.option.doRainParticles": "雨パーティクルを生成",
   "text.autoconfig.particlerain.option.doSplashParticles": "地面に雨が当たる水しぶきを生成",
   "text.autoconfig.particlerain.option.doSmokeParticles": "熱いブロックの上に煙を生成",
   "text.autoconfig.particlerain.option.doRippleParticles": "水面に雨の波紋を生成",
