@@ -10,7 +10,7 @@
   "text.autoconfig.particlerain.option.particleStormDensity": "雷雨時のパーティクル密度",
   "text.autoconfig.particlerain.option.particleStormDensity.@Tooltip": "雷雨中に1ティックごとに天候パーティクルが生成を試みる回数",
   "text.autoconfig.particlerain.option.particleRadius": "パーティクルの表示距離",
-  "text.autoconfig.particlerain.option.particleRadius.@Tooltip": "カメラから何ブロック離れた場所にパーティクルが生成されるかどうか",
+  "text.autoconfig.particlerain.option.particleRadius.@Tooltip": "カメラから何ブロック離れた場所までパーティクルが生成されるかを指定します",
 
   "text.autoconfig.particlerain.option.doRainParticles.@PrefixText": "§l個別エフェクトの有効／無効",
   "text.autoconfig.particlerain.option.doRainParticles": "雨パーティクルを生成",
