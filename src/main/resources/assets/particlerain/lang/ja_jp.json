@@ -12,7 +12,7 @@
   "text.autoconfig.particlerain.option.particleRadius": "パーティクルの表示距離",
   "text.autoconfig.particlerain.option.particleRadius.@Tooltip": "カメラから何ブロック離れた場所までパーティクルが生成されるかを指定します",
 
-  "text.autoconfig.particlerain.option.doRainParticles.@PrefixText": "§l個別エフェクトの有効／無効",
+  "text.autoconfig.particlerain.option.doRainParticles.@PrefixText": "§l個別エフェクトの有効化/無効化",
   "text.autoconfig.particlerain.option.doRainParticles": "雨パーティクルを生成",
   "text.autoconfig.particlerain.option.doSplashParticles": "地面に雨が当たる水しぶきを生成",
   "text.autoconfig.particlerain.option.doSmokeParticles": "熱いブロックの上に煙を生成",
@@ -84,13 +84,13 @@
   "text.autoconfig.particlerain.option.renderVanillaWeather.@PrefixText": "§l互換性設定",
   "text.autoconfig.particlerain.option.renderVanillaWeather": "デフォルトの天候を描画",
   "text.autoconfig.particlerain.option.tickVanillaWeather": "デフォルトの雨の水しぶきを処理",
-  "text.autoconfig.particlerain.option.biomeTint": "バイオームの色に基づいて水のパーティクルに色付け",
+  "text.autoconfig.particlerain.option.biomeTint": "バイオーム毎に水パーティクルを着色",
   "text.autoconfig.particlerain.option.tintMix": "水の色/空の色の混合比",
   "text.autoconfig.particlerain.option.tintMix.@Tooltip": "バイオームの水の色 (0) と空の色 (100) の間での色の混合比",
   "text.autoconfig.particlerain.option.spawnAboveClouds": "雲の高さより上に天候パーティクルを生成",
   "text.autoconfig.particlerain.option.cloudHeight": "雲の高さ",
   "text.autoconfig.particlerain.option.alwaysRaining": "常に天候パーティクルを生成",
   "text.autoconfig.particlerain.option.yLevelWindAdjustment": "高度による風の補正",
-  "text.autoconfig.particlerain.option.syncRegistry": "レジストリを同期",
-  "text.autoconfig.particlerain.option.syncRegistry.@Tooltip": "プレイヤーがLANサーバーに接続できない場合は無効にしてください"
+  "text.autoconfig.particlerain.option.syncRegistry": "レジストリ同期",
+  "text.autoconfig.particlerain.option.syncRegistry.@Tooltip": "プレイヤーがLANサーバーに接続できない場合は無効化して下さい"
 }
