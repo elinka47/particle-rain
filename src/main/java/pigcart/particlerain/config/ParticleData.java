@@ -1,0 +1,285 @@
+package pigcart.particlerain.config;
+
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.particle.Particle;
+import net.minecraft.client.particle.SingleQuadParticle;
+import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.biome.Biome;
+import pigcart.particlerain.ParticleRain;
+import pigcart.particlerain.ParticleSpawner;
+import pigcart.particlerain.WindManager;
+import pigcart.particlerain.VersionUtil;
+import pigcart.particlerain.particle.BlockDisplayParticle;
+import pigcart.particlerain.particle.CustomParticle;
+import pigcart.particlerain.particle.render.BlendedParticleRenderType;
+//? if >=1.21.9 {
+/*import net.minecraft.client.renderer.state./^?>=26.1{^//^level.^//^?}^/QuadParticleRenderState;
+ *///?} else {
+import net.minecraft.client.particle.ParticleRenderType;
+//?}
+
+import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static pigcart.particlerain.config.ConfigManager.getConfig;
+import static pigcart.particlerain.config.ConfigResponders.*;
+import static pigcart.particlerain.config.gui.Annotations.*;
+
+public class ParticleData {
+    
+    public void updateTransientVariables() {
+        biomeList.populateInternalLists();
+        blockList.populateInternalLists();
+        setPresetParticle();
+    }
+    public void setPresetParticle() {
+        final Optional<ParticleType<?>> optional = BuiltInRegistries.PARTICLE_TYPE.getOptional(VersionUtil.parseId(registeredParticleId));
+        if (optional.isEmpty()) {
+            ParticleRain.LOGGER.error("Incorrect configuration: {} is not a valid particle", registeredParticleId);
+        } else {
+            registeredParticle = (ParticleOptions) optional.get();
+        }
+    }
+
+    //TODO @Dropdown(SupplyParticleTypes.class)
+    @OnChange(RefreshScreen.class)
+    public ParticleStyle particleStyle = ParticleStyle.CUSTOM;
+    @OnlyVisibleIf(ParticleIsRegistered.class)
+    public String registeredParticleId = "minecraft:cloud";
+    @NoGUI
+    public transient ParticleOptions registeredParticle = ParticleTypes.CLOUD;
+    @OnlyVisibleIf(ParticleIsBlock.class)
+    public String blockId = "minecraft:dead_bush";
+    @OnlyVisibleIf(ParticleNotDefault.class)
+    public transient String id = "new_particle";
+    @Label(key = "spawning")
+    public Boolean enabled = true;
+    @Slider(step = 0.001F)
+    @Format(Percent.class)
+    public Float density = 1.0F;
+    public Weather weather = Weather.DURING_WEATHER;
+    public ArrayList<Biome.Precipitation> precipitation = new ArrayList<>(List.of(Biome.Precipitation.RAIN));
+    public Whitelist.BiomeList biomeList = new Whitelist.BiomeList();
+    public Whitelist.BlockList blockList = new Whitelist.BlockList();
+    public Boolean needsSkyAccess = true;
+    public SpawnPos spawnPos = SpawnPos.SKY;
+    @Label(key = "motion")
+    public Float windStrength = 0.1F;
+    public Float stormWindStrength = 0.5F;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Float gravity = 0.1F;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Float rotationAmount = 0F;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Float bounciness = 0F;
+    @Format(TimeInTicks.class)
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Integer lifetime = 3000;
+    @Label(key = "appearance")
+    @Slider @Format(Percent.class)
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Float opacity = 1.0F;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public FadeType fadeType = FadeType.DISTANCE;
+    @Format(DistanceInBlocks.class)
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Float size = 0.5F;
+    @Slider @Format(Percent.class)
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Float distanceScaling = 0F;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public RenderType renderType = RenderType.TRANSLUCENT;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public Boolean animateSprites = false;
+    @OnlyVisibleIf(ParticleNotRegistered.class) public ArrayList<String> spriteLocations = new ArrayList<>(List.of("particlerain:new_custom_particle"));
+    @OnlyVisibleIf(ParticleNotRegistered.class)
+    @OnChange(RefreshScreen.class)
+    public TintType tintType = TintType.NONE;
+    @OnlyVisibleIf(ParticleUsesCustomTint.class)
+    public Color customTint = Color.BLACK;
+    @OnChange(RefreshScreen.class)
+    @OnlyVisibleIf(ParticleIsCustom.class) public RotationType rotationType = RotationType.COPY_CAMERA;
+
+    public enum Weather {
+        DURING_WEATHER {
+            public Boolean isCurrent(ClientLevel level) {
+                return level.getRainLevel(1) > 0;
+            }
+        },
+        ONLY_DURING_NORMAL_WEATHER {
+            public Boolean isCurrent(ClientLevel level) {
+                return level.getRainLevel(1) > 0 && !(level.getThunderLevel(1) > 0);
+            }
+        },
+        ONLY_DURING_STORMY_WEATHER {
+            public Boolean isCurrent(ClientLevel level) {
+                return level.getThunderLevel(1) > 0;
+            }
+        },
+        AFTER_WEATHER {
+            public Boolean isCurrent(ClientLevel level) {
+                return ParticleSpawner.afterWeatherTicksLeft > 0;
+            }
+        },
+        CLEAR {
+            public Boolean isCurrent(ClientLevel level) {
+                return !(level.getRainLevel(1) > 0);
+            }
+        },
+        ALWAYS;
+        public Boolean isCurrent(ClientLevel level) {
+            return true;
+        }
+    }
+
+    public enum SpawnPos {
+        //UNDERGROUND
+        SKY,
+        BLOCK_SIDES,
+        BLOCK_BOTTOM,
+        BLOCK_TOP,
+        WORLD_SURFACE {
+            @Override
+            public int renderDistance() {
+                return getConfig().perf.surfaceRange;
+            }
+        };
+        public int renderDistance() {
+            return getConfig().perf.particleDistance;
+        }
+    }
+
+    public enum RenderType {
+        OPAQUE {
+            @Override
+            //? if >=1.21.9 {
+            /*public SingleQuadParticle.Layer get() {
+                return SingleQuadParticle.Layer.OPAQUE;
+            }
+            *///?} else {
+            public ParticleRenderType get() {
+                return ParticleRenderType.PARTICLE_SHEET_OPAQUE;
+            }
+            //?}
+        },
+        TRANSLUCENT {
+            @Override
+            //? if >=1.21.9 {
+            /*public SingleQuadParticle.Layer get() {
+                return SingleQuadParticle.Layer.TRANSLUCENT;
+            }
+            *///?} else {
+            public ParticleRenderType get() {
+                return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
+            }
+            //?}
+        },
+        BLENDED;
+
+        //~ if >=1.21.9 'ParticleRenderType' -> 'SingleQuadParticle.Layer'
+        public ParticleRenderType get() {
+            return BlendedParticleRenderType.INSTANCE;
+        }
+
+    }
+
+    public enum TintType {
+        WATER {
+            public void applyTint(SingleQuadParticle p, ClientLevel level, BlockPos pos, ParticleData data) {
+                if (VersionUtil.shadersEnabled() && getConfig().compat.shaderpackTint) return;
+                final Color waterColor = new Color(BiomeColors.getAverageWaterColor(level, pos));
+                final Color fogColor = VersionUtil.getBiomeFogColor(level, pos);
+                float rCol = Mth.lerp(getConfig().compat.tintMix, waterColor.getRed(), fogColor.getRed());
+                float gCol = Mth.lerp(getConfig().compat.tintMix, waterColor.getGreen(), fogColor.getGreen());
+                float bCol = Mth.lerp(getConfig().compat.tintMix, waterColor.getBlue(), fogColor.getBlue());
+                p.setColor(rCol / 255F, gCol / 255F, bCol / 255F);
+            }
+        },
+        FOG {
+            public void applyTint(SingleQuadParticle p, ClientLevel level, BlockPos pos, ParticleData data) {
+                Color color = VersionUtil.getBiomeFogColor(level, pos);
+                float mul = 0.7f + ((-level.getRainLevel(1) + 1) * 0.2f);
+                p.setColor((color.getRed() * mul) / 255F, (color.getGreen() * mul) / 255F, (color.getBlue() * mul) / 255F);
+            }
+        },
+        MAP {
+            public void applyTint(SingleQuadParticle p, ClientLevel level, BlockPos pos, ParticleData data) {
+                Color color = VersionUtil.getMapColor(level, pos);
+                float variance = level.getRandom().nextFloat() * 0.2F + 0.8F;
+                p.setColor(color.getRed() / 255F * variance,
+                        color.getGreen() / 255F * variance,
+                         color.getBlue() / 255F * variance);
+            }
+        },
+        CUSTOM {
+            public void applyTint(SingleQuadParticle p, ClientLevel level, BlockPos pos, ParticleData data) {
+                p.setColor(data.customTint.getRed() / 255F, data.customTint.getGreen() / 255F, data.customTint.getBlue() / 255F);
+            }
+        },
+        NONE;
+        public void applyTint(SingleQuadParticle p, ClientLevel level, BlockPos pos, ParticleData data) {}
+    }
+
+    public enum RotationType {
+        //~ if >=1.21.9 VertexConsumer -> QuadParticleRenderState {
+        COPY_CAMERA {
+            @Override
+            public void render(VertexConsumer h, Camera camera, float tickPercent, CustomParticle p) {
+                p.renderCameraCopyQuad(h, camera, tickPercent);
+            }
+        },
+        RELATIVE_VELOCITY {
+            @Override
+            public void render(VertexConsumer h, Camera camera, float tickPercent, CustomParticle p) {
+                p.renderRelativeVelocityQuad(h, camera, tickPercent);
+            }
+        },
+        WORLD_VELOCITY {
+            @Override
+            public void render(VertexConsumer h, Camera camera, float tickPercent, CustomParticle p) {
+                p.renderWorldVelocityQuad(h, camera, tickPercent);
+            }
+        },
+        VERTICAL {
+            @Override
+            public void render(VertexConsumer h, Camera camera, float tickPercent, CustomParticle p) {
+                p.renderVerticalQuad(h, camera, tickPercent);
+            }
+        },
+        HORIZONTAL {
+            @Override
+            public void render(VertexConsumer h, Camera camera, float tickPercent, CustomParticle p) {
+                p.renderHorizontalQuad(h, camera, tickPercent);
+            }
+        };
+        public void render(VertexConsumer h, Camera camera, float tickPercent, CustomParticle p) {}
+        //~ }
+    }
+
+    public enum ParticleStyle {
+        REGISTERED {
+            @Override
+            public void spawn(ClientLevel level, double x, double y, double z, ParticleData data) {
+                Particle particle = Minecraft.getInstance().particleEngine.createParticle(data.registeredParticle, x, y, z, 0, 0, 0);
+                if (particle != null) WindManager.track(particle, data);
+            }
+        },
+        BLOCK_MODEL {
+            @Override
+            public void spawn(ClientLevel level, double x, double y, double z, ParticleData data) {
+                Minecraft.getInstance().particleEngine.add(new BlockDisplayParticle(level, x, y, z, data));
+            }
+        },
+        CUSTOM;
+        public void spawn(ClientLevel level, double x, double y, double z, ParticleData data) {
+            Minecraft.getInstance().particleEngine.add(new CustomParticle(level, x, y, z, data));
+        }
+    }
+
+    public enum FadeType {
+        IN_AND_OUT,
+        OUT,
+        DISTANCE
+    }
+}

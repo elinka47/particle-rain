@@ -11,25 +11,25 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
 import pigcart.particlerain.ParticleRain;
 import pigcart.particlerain.VersionUtil;
-import pigcart.particlerain.config.ConfigData;
-import pigcart.particlerain.config.ConfigManager;
+import pigcart.particlerain.ParticleLoader;
 import pigcart.particlerain.config.gui.Annotations.*;
-import pigcart.particlerain.config.gui.Annotations.Label;
 
-import java.awt.*;
+import java.awt.Color;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.net.URI;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static pigcart.particlerain.ParticleRain.MOD_ID;
 
-public class Widgets {
+public class WidgetUtil {
     public static final int BUTTON_WIDTH = 150;
     public static final int BIG_BUTTON_WIDTH = 310;
     public static final int BUTTON_HEIGHT = 20;
@@ -70,12 +70,12 @@ public class Widgets {
                     if (className.isEmpty()) className = value.getClass().getEnclosingClass().getSimpleName();
                     return Component.translatable(MOD_ID + "." + className + "." + value);
                 }
-                //? if >=1.21.11 {
-                /*,()-> initialValue)
+        //? if >=1.21.11 {
+                /*,()-> initialValue).withValues(values);
                  *///?} else {
-        ).withInitialValue(initialValue)
-                //?}
-                .withValues(values);
+        ).withValues(values).withInitialValue(initialValue);
+        // in 1.20.1 withValues must be called before withInitialValue otherwise it doesnt get the index correctly
+        //?}
         if (displayOnlyValue) {
             builder.displayOnlyValue(/*? >=1.21.9 <1.21.11 {*//*true*//*?}*/);
         }
@@ -86,7 +86,8 @@ public class Widgets {
 
     public static AbstractWidget getFloat(int width, int x, String name, float initialValue, Consumer<Float> onValueChange, Function<Object, Component> valueFormatter) {
         final DecimalFormat df = new DecimalFormat();
-        df.setMaximumFractionDigits(6);
+        df.setDecimalFormatSymbols(DecimalFormatSymbols.getInstance(Locale.ROOT));
+        df.setMaximumFractionDigits(3);
         final InputWidget inputWidget = new InputWidget(width, x,
                 df.format(initialValue),
                 (string) -> onValueChange.accept(Float.valueOf(string)),
@@ -123,6 +124,13 @@ public class Widgets {
         return Button.builder(name, onPress).bounds(0, 0, BIG_BUTTON_WIDTH, BUTTON_HEIGHT).build();
     }
 
+    public static AbstractWidget getRemoveButton(Button.OnPress onPress) {
+        AbstractWidget removeButton = getButton(Component.literal("❌").withStyle(ChatFormatting.RED), onPress);
+        removeButton.setWidth(BUTTON_HEIGHT);
+        ((AbstractWidgetAccess)removeButton).pigcart$setOffset(BIG_BUTTON_WIDTH - BUTTON_HEIGHT);
+        return removeButton;
+    }
+
     public static AbstractWidget getSlider(String name, float initialValue, Consumer<Float> onValueChange, float min, float max, float step, Function<Object, Component> valueFormatter) {
         return new AbstractSliderButton(0, 0, BIG_BUTTON_WIDTH, BUTTON_HEIGHT,
                 Component.translatable(name).append(": ").append(valueFormatter.apply(initialValue)),
@@ -137,16 +145,16 @@ public class Widgets {
         };
     }
 
-    public static AbstractWidget[] getHexColor(int width, int x, String name, Object initialValue, Consumer<Object> onValueChange, Function<Object, Component> valueFormatter) {
-        String value = ConfigManager.ColorTypeAdapter.getString((Color) initialValue);
+    public static AbstractWidget[] getHexColor(String name, Object initialValue, Consumer<Object> onValueChange, Function<Object, Component> valueFormatter) {
+        String value = ParticleLoader.ColorTypeAdapter.getString((Color) initialValue);
         Consumer<String> onChange = (string) -> {
-            Color color = ConfigManager.ColorTypeAdapter.getColor(string);
+            Color color = ParticleLoader.ColorTypeAdapter.getColor(string);
             onValueChange.accept(color);
         };
-        InputWidget input = (InputWidget) getString(width, x, name, value, onChange, valueFormatter);
+        InputWidget input = (InputWidget) getString(BUTTON_WIDTH, BUTTON_WIDTH + 8, name, value, onChange, valueFormatter);
         input.setFilter(InputWidget.NON_HEX);
         return new AbstractWidget[]{
-                Widgets.getOptionLabel(Component.translatable(name).append(":")),
+                WidgetUtil.getOptionLabel(Component.translatable(name).append(":")),
                 input
         };
     }
@@ -154,9 +162,10 @@ public class Widgets {
     @SuppressWarnings("unchecked")
     public static void addOptionWidgets(ConfigScreen screen) {
         if (screen.config instanceof List<?>) {
-            addListOptions(screen, (List<?>)screen.config, (List<?>)screen.configDefault, screen.configGenericType);
+            addListOptions(screen, (List<?>)screen.config, screen.configGenericType);
             return;
         }
+
         Field[] fields = screen.config.getClass().getFields();
         for (Field field : fields) {
             if (field.isAnnotationPresent(NoGUI.class)) continue;
@@ -169,8 +178,8 @@ public class Widgets {
                 } catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {throw new RuntimeException(e);}
             }
             if (field.isAnnotationPresent(Label.class)) {
-                AbstractWidget[] widgets = new AbstractWidget[]{Widgets.getLabel(Component.translatable(field.getAnnotation(Label.class).key()))};
-                screen.add(widgets);
+                AbstractWidget[] widgets = new AbstractWidget[]{WidgetUtil.getLabel(Component.translatable(field.getAnnotation(Label.class).key()))};
+                screen.addRow(widgets);
             }
             String name = MOD_ID + "." + field.getName();
             field.setAccessible(true);
@@ -181,114 +190,107 @@ public class Widgets {
                 currentValue = field.get(screen.config);
                 defaultValue = field.get(screen.configDefault);
             } catch (IllegalAccessException e) {throw new RuntimeException(e);}
-            Consumer onValueChange = (value) -> {
-                try {
-                    field.set(screen.config, value);
-                    if (field.isAnnotationPresent(OnChange.class)) {
-                        final OnChange onChange = field.getAnnotation(OnChange.class);
-                        ((Runnable) onChange.value().getConstructors()[0].newInstance()).run();
-                    }
-                } catch (IllegalAccessException | InvocationTargetException | InstantiationException e) {throw new RuntimeException(e);}
-            };
-            Function<Object, Component> valueFormatter = (value)-> Component.literal(value.toString());
-            if (field.isAnnotationPresent(Format.class)) {
-                final Format format = field.getAnnotation(Format.class);
-                try {
-                    valueFormatter = (Function<Object, Component>) format.value().getConstructors()[0].newInstance();
-                } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+
+            Consumer onValueChange = (value) -> setConfigField(screen.config, field, value);
+
+            Function<Object, Component> valueFormatter = getValueFormatter(field);
+
             if (type.equals(ArrayList.class)) {
                 final Class<?> listType = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
-
-                if (field.getName().equals("particles")) {
-                    List<ConfigData.ParticleData> particles = (List<ConfigData.ParticleData>) currentValue;
-                    for (int i = 0; i < particles.size(); i+= 2) {
-                        ConfigData.ParticleData leftParticle = particles.get(i);
-                        AbstractWidget left = Widgets.getBool(MOD_ID + "." + leftParticle.id,
-                                leftParticle.enabled,
-                                (value) -> leftParticle.enabled = value);
-                        left.setWidth(BUTTON_WIDTH);
-                        if (i < particles.size() - 1) {
-                            ConfigData.ParticleData rightParticle = particles.get(i + 1);
-                            AbstractWidget right = Widgets.getBool(MOD_ID + "." + rightParticle.id,
-                                            rightParticle.enabled,
-                                            (value) -> rightParticle.enabled = value);
-                            ((AbstractWidgetAccess)right).particle_rain$setOffset(left.getWidth() + 8);
-                            right.setWidth(BUTTON_WIDTH);
-                            screen.add(left, right);
-                        } else {
-                            screen.add(left);
-                        }
-                    }
-                } else if (field.isAnnotationPresent(NoSubMenu.class)) {
-                    addListOptions(screen, (List<?>)currentValue, (List<?>)defaultValue, listType);
-                    continue; // skip adding sub-menu
+                if (field.isAnnotationPresent(NoSubMenu.class)) {
+                    addListOptions(screen, (List<?>)currentValue, listType);
+                } else {
+                    screen.addRow(WidgetUtil.getButton(Component.translatable(name), (bttn) ->
+                            Minecraft.getInstance().setScreen(new ConfigScreen(
+                                    screen.getFreshScreen(),
+                                    currentValue,
+                                    defaultValue,
+                                    listType,
+                                    Component.translatable(name)
+                            ))
+                    ));
                 }
-                AbstractWidget[] widgets = new AbstractWidget[]{Widgets.getButton(Component.translatable(name).append("..."), (bttn) ->
-                        Minecraft.getInstance().setScreen(new ConfigScreen(
-                                screen.getFreshScreen(),
-                                currentValue,
-                                defaultValue,
-                                listType,
-                                Component.translatable(name)
-                        ))
-                )};
-                screen.add(widgets);
             } else {
-                AbstractWidget[] widgets = getOptionWidget(screen, field, name, currentValue, defaultValue, onValueChange, valueFormatter, type);
-                screen.add(widgets);
+                AbstractWidget[] widgets = getRowWidgets(screen, field, name, currentValue, defaultValue, onValueChange, valueFormatter, type);
+                for (AbstractWidget widget : widgets) {
+                    widget.setTooltip(Tooltip.create(Component.translatableWithFallback(name + ".description", "")));
+                }
+                screen.addRow(widgets);
             }
         }
-        appendBespokeParticleOptions(screen);
     }
+
     @SuppressWarnings("unchecked")
-    private static AbstractWidget[] getOptionWidget(ConfigScreen screen, Field field, String name, Object currentValue, Object defaultValue, Consumer onValueChange, Function<Object, Component> valueFormatter, Class<?> type) {
+    private static Function<Object, Component> getValueFormatter(Field field) {
+        if (!field.isAnnotationPresent(Format.class)) {
+            return (value) -> Component.literal(value.toString());
+        }
+        final Format format = field.getAnnotation(Format.class);
+        try {
+            return (Function<Object, Component>) format.value().getConstructors()[0].newInstance();
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static <T> void setConfigField(Object config, Field field, T value) {
+        try {
+            Object oldValue = field.get(config);
+            field.set(config, value);
+            if (oldValue != value && field.isAnnotationPresent(OnChange.class)) {
+                final OnChange onChange = field.getAnnotation(OnChange.class);
+                ((Runnable) onChange.value().getConstructors()[0].newInstance()).run();
+            }
+        } catch (IllegalAccessException | InvocationTargetException | InstantiationException e) {throw new RuntimeException(e);}
+    }
+
+    @SuppressWarnings("unchecked")
+    private static AbstractWidget[] getRowWidgets(ConfigScreen screen, Field field, String name, Object currentValue, Object defaultValue, Consumer onValueChange, Function<Object, Component> valueFormatter, Class<?> type) {
         if (field.isAnnotationPresent(Slider.class)) {
             final Slider slider = field.getAnnotation(Slider.class);
             return new AbstractWidget[]{
-                    Widgets.getSlider(name, (Float) currentValue, onValueChange, slider.min(), slider.max(), slider.step(), valueFormatter)};
-        } else if (type.equals(boolean.class)) {
+                    WidgetUtil.getSlider(name, (Float) currentValue, onValueChange, slider.min(), slider.max(), slider.step(), valueFormatter)};
+        } else if (type.equals(boolean.class) || type.equals(Boolean.class)) {
             if (field.isAnnotationPresent(BooleanFormat.class)) {
                 final BooleanFormat format = field.getAnnotation(BooleanFormat.class);
                 final Component t = Component.translatable(MOD_ID + "." + format.t());
                 final Component f = Component.translatable(MOD_ID + "." + format.f());
                 valueFormatter = (value) -> (boolean)value ? t : f;
-                return new AbstractWidget[]{Widgets.getBool(name, (Boolean) currentValue, onValueChange, valueFormatter)};
+                return new AbstractWidget[]{WidgetUtil.getBool(name, (Boolean) currentValue, onValueChange, valueFormatter)};
             } else {
-                return new AbstractWidget[]{Widgets.getBool(name, (Boolean) currentValue, onValueChange)};
+                return new AbstractWidget[]{WidgetUtil.getBool(name, (Boolean) currentValue, onValueChange)};
             }
-        } else if (type.equals(float.class)) {
+        } else if (type.equals(float.class) || type.equals(Float.class)) {
             return new AbstractWidget[]{
-                    Widgets.getOptionLabel(Component.translatable(name).append(":")),
-                    Widgets.getFloat(BUTTON_WIDTH, BUTTON_WIDTH + 8, "", (Float) currentValue, onValueChange, valueFormatter)};
-        } else if (type.equals(int.class)) {
+                    WidgetUtil.getOptionLabel(Component.translatable(name).append(":")),
+                    WidgetUtil.getFloat(BUTTON_WIDTH, BUTTON_WIDTH + 8, "", (Float) currentValue, onValueChange, valueFormatter)};
+        } else if (type.equals(int.class) || type.equals(Integer.class)) {
             return new AbstractWidget[]{
-                    Widgets.getOptionLabel(Component.translatable(name).append(":")),
-                    Widgets.getInt(BUTTON_WIDTH, BUTTON_WIDTH + 8, name, (Integer) currentValue, onValueChange, valueFormatter)};
+                    WidgetUtil.getOptionLabel(Component.translatable(name).append(":")),
+                    WidgetUtil.getInt(BUTTON_WIDTH, BUTTON_WIDTH + 8, name, (Integer) currentValue, onValueChange, valueFormatter)};
         } else if (type.equals(String.class)) {
             return new AbstractWidget[]{
-                    Widgets.getOptionLabel(Component.translatable(name).append(":")),
-                    Widgets.getString(BUTTON_WIDTH, BUTTON_WIDTH + 8, name, (String) currentValue, onValueChange, valueFormatter)};
+                    WidgetUtil.getOptionLabel(Component.translatable(name).append(":")),
+                    WidgetUtil.getString(BUTTON_WIDTH, BUTTON_WIDTH + 8, name, (String) currentValue, onValueChange, valueFormatter)};
         } else if (type.isEnum()) {
             return new AbstractWidget[]{
-                    Widgets.getEnum(name, false, currentValue, onValueChange)};
+                    WidgetUtil.getEnum(name, false, currentValue, onValueChange)};
         } else if (type.equals(URI.class)) {
             return new AbstractWidget[]{
-                    Widgets.getButton(Component.translatable(name), (bttn)-> Minecraft.getInstance().setScreen(new ConfirmLinkScreen(
+                    WidgetUtil.getButton(Component.translatable(name), (bttn)-> Minecraft.getInstance().setScreen(new ConfirmLinkScreen(
                             (result) -> {
                                 if (result) VersionUtil.openUri((URI) currentValue);
                                 Minecraft.getInstance().setScreen(screen);
                                 },
+                            //~ if >=26.3 'currentValue.toString()' -> 'URI.create(currentValue.toString())'
                             currentValue.toString(),
                             true
             )))};
         } else if (type.equals(Color.class)) {
-            return getHexColor(BIG_BUTTON_WIDTH, 0, name, currentValue, onValueChange, valueFormatter);
+            return getHexColor(name, currentValue, onValueChange, valueFormatter);
         } else if (type.getFields().length > 0) {
             return new AbstractWidget[]{
-                    Widgets.getButton(Component.translatable(name).append("..."), (bttn)->
+                    WidgetUtil.getButton(Component.translatable(name), (bttn)->
                             Minecraft.getInstance().setScreen(new ConfigScreen(
                                     screen,
                                     currentValue,
@@ -298,66 +300,49 @@ public class Widgets {
                     )};
         } else {
             ParticleRain.LOGGER.error("Unable to create option for field {}", field.getName());
-            return new AbstractWidget[]{Widgets.getLabel(Component.literal("Unable to create option for field " + field.getName()))};
+            return new AbstractWidget[]{WidgetUtil.getLabel(Component.literal("Unable to create option for field " + field.getName()))};
         }
     }
 
     @SuppressWarnings("unchecked")
-    private static <E> void addListOptions(ConfigScreen screen, List<E> list, List<?> defaultList, Class<?> listEntryType) {
+    private static <E> void addListOptions(ConfigScreen screen, List<E> list, Class<?> listEntryType) {
         if (list.isEmpty()) {
-            screen.add(getLabel(Component.translatable("mco.configure.world.slot.empty")));
+            screen.addRow(getLabel(Component.translatable("mco.configure.world.slot.empty")));
         }
-        //final Class<?> listEntryType = list.get(0).getClass();
         for (int i = 0; i < list.size(); i++) {
             Object entry = list.get(i);
-            Object defaultEntry = i < defaultList.size() ? defaultList.get(i) : getNewValue(listEntryType);
             final int index = i;
             final Consumer<Object> onValueChange = (value) -> list.set(index, (E) value);
-            final AbstractWidget listEntryWidget = getListEntryWidget(screen, listEntryType, String.valueOf(index + 1), entry, defaultEntry, onValueChange);
-            final AbstractWidget removeButton = getButton(Component.literal("❌").withStyle(ChatFormatting.RED), (bttn) -> {
+            final AbstractWidget listEntryWidget = getListEntryWidget(listEntryType, String.valueOf(index + 1), entry, onValueChange);
+            final AbstractWidget removeButton = getRemoveButton((bttn) -> {
                 list.remove(index);
                 screen.refresh();
             });
             listEntryWidget.setWidth(BIG_BUTTON_WIDTH - BUTTON_HEIGHT - 2);
-            removeButton.setWidth(BUTTON_HEIGHT);
-            ((AbstractWidgetAccess)removeButton).particle_rain$setOffset(BIG_BUTTON_WIDTH - BUTTON_HEIGHT);
-            screen.add(listEntryWidget, removeButton);
+            screen.addRow(listEntryWidget, removeButton);
         }
         final MutableComponent addButtonText = Component.translatable("particlerain.addNew");
-        final AbstractWidget addButton = Widgets.getButton(addButtonText, (bttn) -> {
-            Object newListEntry = getNewValue(listEntryType);
-            Object defaultEntry = getNewValue(listEntryType);
-            list.add((E) newListEntry);
-            if (listEntryType.equals(ConfigData.ParticleData.class)) {
-                Minecraft.getInstance().setScreen(new ConfigScreen(screen.getFreshScreen(), newListEntry, defaultEntry, addButtonText));
-            } else {
-                screen.refresh();
-            }
+        final AbstractWidget addButton = WidgetUtil.getButton(addButtonText, (bttn) -> {
+            list.add((E) getNewValue(listEntryType));
+            screen.refresh();
         });
         if (!(list instanceof ArrayList<?>)) addButton.active = false;
-        screen.add(addButton);
+        screen.addRow(addButton);
     }
 
     @SuppressWarnings("unchecked")
-    private static AbstractWidget getListEntryWidget(ConfigScreen screen, Class<?> type, String name, Object entry, Object defaultEntry, Consumer onValueChange) {
+    private static AbstractWidget getListEntryWidget(Class<?> type, String name, Object entry, Consumer onValueChange) {
         if (type.equals(String.class)) {
-            return Widgets.getString(BIG_BUTTON_WIDTH, 0,
+            return WidgetUtil.getString(BIG_BUTTON_WIDTH, 0,
                     name,
                     (String) entry,
                     onValueChange,
                     (value)-> Component.literal(value.toString())
             );
-        } else if (type.equals(ConfigData.ParticleData.class)) {
-            String particleKey = MOD_ID + "." + ((ConfigData.ParticleData) entry).id;
-            return Widgets.getButton(Component.translatable(particleKey), (bttn) ->
-                    Minecraft.getInstance().setScreen(new ConfigScreen(
-                            screen.getFreshScreen(), entry, defaultEntry, Component.translatable(particleKey)
-                    ))
-            );
         } else if (type.isEnum()) {
-            return Widgets.getEnum(name, true, entry, onValueChange);
+            return WidgetUtil.getEnum(name, true, entry, onValueChange);
         } else {
-            return Widgets.getLabel(Component.literal(type.getSimpleName() + " unimplemented"));
+            return WidgetUtil.getLabel(Component.literal(type.getSimpleName() + " unimplemented"));
         }
     }
 
@@ -371,32 +356,6 @@ public class Widgets {
                 ParticleRain.LOGGER.error("Couldn't get new value for: {}", type.getSimpleName());
                 throw new RuntimeException(e);
             }
-        }
-    }
-
-    private static void appendBespokeParticleOptions(ConfigScreen screen) {
-        try {
-            if (screen.config instanceof ConfigData.ParticleData particleData) {
-                if (particleData.usePresetParticle) {
-                    String configId = VersionUtil.parseId(particleData.presetParticleId).getPath();
-                    if (ParticleRain.particleConfigIds.contains(configId)) {
-                        final Field f = ConfigData.class.getField(configId);
-                        f.setAccessible(true);
-                        final Object bespokeParticleConfig = f.get(ConfigManager.config);
-                        final Object defaultConfig = f.get(ConfigManager.getDefaultConfig());
-                        AbstractWidget button = getButton(Component.translatable("particlerain.appearance"),
-                                (bttn) -> Minecraft.getInstance().setScreen(new ConfigScreen(
-                                        screen,
-                                        bespokeParticleConfig,
-                                        defaultConfig,
-                                        Component.translatable("particlerain.appearance")
-                                )));
-                        screen.list.add(button);
-                    }
-                }
-            }
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
         }
     }
 }

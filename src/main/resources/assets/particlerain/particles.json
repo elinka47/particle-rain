@@ -1,0 +1,434 @@
+{
+  "rain": {
+    "gravity": 0.9,
+    "windStrength": 0.4,
+    "stormWindStrength": 0.8,
+    "size": 0.75,
+    "spriteLocations": [
+      "particlerain:rain_0",
+      "particlerain:rain_1",
+      "particlerain:rain_2",
+      "particlerain:rain_3",
+      "particlerain:rain_4",
+      "particlerain:rain_5",
+      "particlerain:rain_6",
+      "particlerain:rain_7",
+      "particlerain:rain_8",
+      "particlerain:rain_9",
+      "particlerain:rain_10",
+      "particlerain:rain_11",
+      "particlerain:rain_12",
+      "particlerain:rain_13",
+      "particlerain:rain_14",
+      "particlerain:rain_15"
+    ],
+    "tintType": "WATER",
+    "rotationType": "RELATIVE_VELOCITY"
+  },
+  "heavy_rain": {
+    "gravity": 1,
+    "weather": "ONLY_DURING_STORMY_WEATHER",
+    "windStrength": 0.4,
+    "stormWindStrength": 0.8,
+    "size": 0.75,
+    "spriteLocations": [
+      "particlerain:heavy_rain_0",
+      "particlerain:heavy_rain_1",
+      "particlerain:heavy_rain_2",
+      "particlerain:heavy_rain_3"
+    ],
+    "tintType": "WATER",
+    "rotationType": "RELATIVE_VELOCITY"
+  },
+  "snow": {
+    "density": 0.3,
+    "precipitation": [
+      "SNOW"
+    ],
+    "gravity": 0.05,
+    "windStrength": 0.01,
+    "stormWindStrength": 0.1,
+    "rotationAmount": 0.4,
+    "size": 0.75,
+    "spriteLocations": [
+      "particlerain:snow_0",
+      "particlerain:snow_1",
+      "particlerain:snow_2",
+      "particlerain:snow_3",
+      "particlerain:snow_4",
+      "particlerain:snow_5",
+      "particlerain:snow_6",
+      "particlerain:snow_7",
+      "particlerain:snow_8",
+      "particlerain:snow_9",
+      "particlerain:snow_10",
+      "particlerain:snow_11",
+      "particlerain:snow_12",
+      "particlerain:snow_13",
+      "particlerain:snow_14",
+      "particlerain:snow_15"
+    ]
+  },
+  "heavy_snow": {
+    "density": 0.4,
+    "precipitation": [
+      "SNOW"
+    ],
+    "weather": "ONLY_DURING_STORMY_WEATHER",
+    "gravity": 0.1,
+    "windStrength": 0.01,
+    "stormWindStrength": 0.1,
+    "rotationAmount": 0.4,
+    "size": 0.75,
+    "spriteLocations": [
+      "particlerain:heavy_snow_0",
+      "particlerain:heavy_snow_1",
+      "particlerain:heavy_snow_2",
+      "particlerain:heavy_snow_3"
+    ]
+  },
+  "dust": {
+    "precipitation": [
+      "NONE"
+    ],
+    "blockList": {
+      "entries": [
+        "#minecraft:camel_sand_step_sound_blocks",
+        "#minecraft:sand",
+        "#minecraft:terracotta",
+        "#c:sandstone_blocks",
+        "minecraft:coarse_dirt"
+      ],
+      "isWhitelist": true
+    },
+    "biomeList": {
+      "entries": [
+        "#c:in_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "gravity": 0.1,
+    "windStrength": 0.7,
+    "stormWindStrength": 1,
+    "rotationAmount": 0.1,
+    "size": 0.25,
+    "spriteLocations": [
+      "minecraft:generic_0",
+      "minecraft:generic_1",
+      "minecraft:generic_2"
+    ],
+    "tintType": "MAP"
+  },
+  "skittering_dust": {
+    "density": 0.2,
+    "precipitation": [
+      "NONE"
+    ],
+    "blockList": {
+      "entries": [
+        "#minecraft:camel_sand_step_sound_blocks",
+        "#minecraft:sand",
+        "#minecraft:terracotta",
+        "#c:sandstone_blocks",
+        "minecraft:coarse_dirt"
+      ],
+      "isWhitelist": true
+    },
+    "biomeList": {
+      "entries": [
+        "#c:in_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "BLOCK_TOP",
+    "gravity": 0.5,
+    "windStrength": 0.8,
+    "stormWindStrength": 1.0,
+    "bounciness": 0.15,
+    "rotationAmount": 1.0,
+    "lifetime": 60,
+    "size": 0.2,
+    "renderType": "OPAQUE",
+    "spriteLocations": [
+      "minecraft:generic_0",
+      "minecraft:generic_1",
+      "minecraft:generic_2"
+    ],
+    "tintType": "MAP"
+  },
+  "splatter": {
+    "particleStyle": "REGISTERED",
+    "registeredParticleId": "minecraft:rain",
+    "blockList": {
+      "entries": [
+        "minecraft:lava"
+      ],
+      "isWhitelist": false
+    },
+    "spawnPos": "BLOCK_TOP",
+    "windStrength": 0.1,
+    "stormWindStrength": 0.2
+  },
+  "ripple": {
+    "particleStyle": "CUSTOM",
+    "gravity": 0,
+    "windStrength": 0,
+    "stormWindStrength": 0,
+    "blockList": {
+      "entries": [
+        "minecraft:water"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "BLOCK_TOP",
+    "animateSprites": true,
+    "spriteLocations": [
+      "particlerain:ripple_0",
+      "particlerain:ripple_1",
+      "particlerain:ripple_2",
+      "particlerain:ripple_3",
+      "particlerain:ripple_4",
+      "particlerain:ripple_5",
+      "particlerain:ripple_6",
+      "particlerain:ripple_7"
+    ],
+    "rotationType": "HORIZONTAL",
+    "renderType": "TRANSLUCENT",
+    "size": 0.25,
+    "fadeType": "OUT",
+    "lifetime": 7,
+    "tintType": "WATER"
+  },
+  "smoke": {
+    "particleStyle": "REGISTERED",
+    "registeredParticleId": "minecraft:smoke",
+    "blockList": {
+      "entries": [
+        "#minecraft:strider_warm_blocks",
+        "#minecraft:infiniburn_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "needsSkyAccess": true,
+    "spawnPos": "BLOCK_TOP"
+  },
+  "streak": {
+    "particleStyle": "REGISTERED",
+    "registeredParticleId": "particlerain:streak",
+    "density": 0.2,
+    "blockList": {
+      "entries": [
+        "#minecraft:impermeable",
+        "#c:glass_panes",
+        "#minecraft:mineable/pickaxe"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "BLOCK_SIDES"
+  },
+  "shrub": {
+    "particleStyle": "BLOCK_MODEL",
+    "blockId": "minecraft:dead_bush",
+    "density": 0.01,
+    "bounciness": 0.15,
+    "gravity": 0.5,
+    "windStrength": 0.4,
+    "rotationAmount": 1,
+    "size": 1,
+    "precipitation": [
+      "NONE"
+    ],
+    "blockList": {
+      "entries": [
+        "#minecraft:camel_sand_step_sound_blocks",
+        "#minecraft:sand",
+        "#minecraft:terracotta",
+        "minecraft:coarse_dirt"
+      ],
+      "isWhitelist": true
+    },
+    "biomeList": {
+      "entries": [
+        "#c:in_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "WORLD_SURFACE"
+  },
+  "fog_after_rain": {
+    "density": 0.5,
+    "gravity": 0,
+    "windStrength": 0,
+    "stormWindStrength": 0,
+    "weather": "AFTER_WEATHER",
+    "biomeList": {
+      "entries": [
+        "minecraft:plains",
+        "minecraft:meadow",
+        "#c:is_windswept"
+      ],
+      "isWhitelist": false
+    },
+    "blockList": {
+      "entries": [
+        "#minecraft:dirt",
+        "#minecraft:substrate_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "WORLD_SURFACE",
+    "spriteLocations": [
+      "particlerain:fog_translucent"
+    ],
+    "rotationType": "HORIZONTAL",
+    "renderType": "BLENDED",
+    "size": 2,
+    "distanceScaling": 0.1,
+    "fadeType": "IN_AND_OUT",
+    "lifetime": 250,
+    "tintType": "FOG"
+  },
+  "vertical_fog_after_rain": {
+    "density": 0.5,
+    "weather": "AFTER_WEATHER",
+    "biomeList": {
+      "entries": [
+        "minecraft:plains",
+        "minecraft:meadow",
+        "#c:is_windswept"
+      ],
+      "isWhitelist": false
+    },
+    "blockList": {
+      "entries": [
+        "#minecraft:substrate_overworld",
+        "#minecraft:dirt"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "WORLD_SURFACE",
+    "gravity": 0.0,
+    "windStrength": 0.0,
+    "stormWindStrength": 0.0,
+    "rotationAmount": 0.0,
+    "bounciness": 0.0,
+    "lifetime": 250,
+    "opacity": 1.0,
+    "fadeType": "IN_AND_OUT",
+    "size": 2,
+    "distanceScaling": 0.1,
+    "renderType": "BLENDED",
+    "spriteLocations": [
+      "particlerain:horizontal_fog"
+    ],
+    "tintType": "FOG",
+    "rotationType": "VERTICAL"
+  },
+  "fog": {
+    "density": 0.5,
+    "gravity": 0,
+    "windStrength": 0,
+    "stormWindStrength": 0,
+    "weather": "ALWAYS",
+    "biomeList": {
+      "entries": [
+        "#c:is_wet",
+        "#c:is_spooky",
+        "#c:climate_wet"
+      ],
+      "isWhitelist": true
+    },
+    "blockList": {
+      "entries": [
+        "#minecraft:dirt",
+        "#minecraft:substrate_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "WORLD_SURFACE",
+    "spriteLocations": [
+      "particlerain:fog_translucent"
+    ],
+    "rotationType": "HORIZONTAL",
+    "renderType": "BLENDED",
+    "size": 2,
+    "distanceScaling": 0.1,
+    "fadeType": "IN_AND_OUT",
+    "lifetime": 250,
+    "tintType": "FOG"
+  },
+  "vertical_fog": {
+    "enabled": true,
+    "density": 0.5,
+    "weather": "ALWAYS",
+    "biomeList": {
+      "entries": [
+        "#c:is_wet",
+        "#c:is_spooky",
+        "#c:climate_wet"
+      ],
+      "isWhitelist": true
+    },
+    "blockList": {
+      "entries": [
+        "#minecraft:substrate_overworld",
+        "#minecraft:dirt"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "WORLD_SURFACE",
+    "gravity": 0.0,
+    "windStrength": 0.0,
+    "stormWindStrength": 0.0,
+    "rotationAmount": 0.0,
+    "bounciness": 0.0,
+    "lifetime": 250,
+    "opacity": 1.0,
+    "fadeType": "IN_AND_OUT",
+    "size": 2,
+    "distanceScaling": 0.1,
+    "renderType": "BLENDED",
+    "spriteLocations": [
+      "particlerain:horizontal_fog"
+    ],
+    "tintType": "FOG",
+    "rotationType": "VERTICAL"
+  },
+  "dust_haze": {
+    "enabled": true,
+    "lifetime": 100,
+    "gravity": 0.1,
+    "windStrength": 0.5,
+    "stormWindStrength": 0.8,
+    "rotationAmount": 0.1,
+    "opacity": 0.4,
+    "size": 0.4,
+    "distanceScaling": 1,
+    "spriteLocations": [
+      "particlerain:fog_dithered"
+    ],
+    "rotationType": "COPY_CAMERA",
+    "precipitation": [
+      "NONE"
+    ],
+    "blockList": {
+      "entries": [
+        "#minecraft:camel_sand_step_sound_blocks",
+        "#minecraft:sand",
+        "#minecraft:terracotta",
+        "#c:sandstone_blocks",
+        "minecraft:coarse_dirt"
+      ],
+      "isWhitelist": true
+    },
+    "biomeList": {
+      "entries": [
+        "#c:in_overworld"
+      ],
+      "isWhitelist": true
+    },
+    "spawnPos": "WORLD_SURFACE",
+    "bounciness": 0.15,
+    "tintType": "MAP"
+  }
+}

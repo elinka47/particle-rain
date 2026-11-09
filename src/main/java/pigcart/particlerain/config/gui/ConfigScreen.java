@@ -1,5 +1,6 @@
 package pigcart.particlerain.config.gui;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.StringWidget;
@@ -8,8 +9,9 @@ import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import pigcart.particlerain.ParticleRain;
+import pigcart.particlerain.ParticleLoader;
 import pigcart.particlerain.config.ConfigManager;
+
 //? <=1.20.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?}
@@ -19,10 +21,12 @@ import java.lang.reflect.Field;
 public class ConfigScreen extends Screen {
     final Object config;
     final Object configDefault;
+    /// the generic type if this config object is a list
     final Class<?> configGenericType;
     WidgetList list;
     protected final Screen lastScreen;
     public final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
+    public static boolean shouldReloadResources = false;
 
     public ConfigScreen(Screen lastScreen, Object config, Object configDefault, Class<?> configGenericType, Component title) {
         super(title);
@@ -61,7 +65,7 @@ public class ConfigScreen extends Screen {
         list = new WidgetList(minecraft, width,
                 /*? >=1.21.1 {*//*layout.getContentHeight()*//*?} else {*/height/*?}*/,
                 32, height - 32, 25);
-        Widgets.addOptionWidgets(this);
+        WidgetUtil.addOptionWidgets(this);
 
         //? <=1.20.1 {
         addWidget(list);
@@ -76,15 +80,7 @@ public class ConfigScreen extends Screen {
         final Button resetButton = Button.builder(
                 Component.translatable("controls.reset").append(" ").append(this.title),
                 (button) -> {
-                    ParticleRain.LOGGER.info("Reset config");
-                    for (Field field : this.config.getClass().getFields()) {
-                        try {
-                            field.setAccessible(true);
-                            field.set(config, field.get(configDefault));
-                        } catch (IllegalAccessException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
+                    resetConfig();
                     refresh();
                 }
         ).build();
@@ -96,6 +92,17 @@ public class ConfigScreen extends Screen {
 
         row.addChild(resetButton);
         row.addChild(doneButton);
+    }
+
+    void resetConfig() {
+        for (Field field : this.config.getClass().getFields()) {
+            try {
+                field.setAccessible(true);
+                field.set(config, field.get(configDefault));
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     //? >=1.21.1 {
@@ -118,6 +125,11 @@ public class ConfigScreen extends Screen {
     @Override
     public void removed() {
         ConfigManager.save();
+        ParticleLoader.saveCustomParticles();
+        if (shouldReloadResources) {
+            shouldReloadResources = false;
+            Minecraft.getInstance().reloadResourcePacks();
+        }
     }
 
     @Override
@@ -125,12 +137,12 @@ public class ConfigScreen extends Screen {
         minecraft.setScreen(lastScreen);
     }
 
-    public Screen getFreshScreen() {
+    public ConfigScreen getFreshScreen() {
         return new ConfigScreen(this.lastScreen, this.config, this.configDefault, this.configGenericType, this.title);
     }
 
     public void refresh() {
-        final ConfigScreen freshScreen = new ConfigScreen(this.lastScreen, this.config, this.configDefault, this.configGenericType, this.title);
+        final ConfigScreen freshScreen = getFreshScreen();
         minecraft.setScreen(freshScreen);
         freshScreen.list.setScrollAmount(
                 //? >=1.21.4 {
@@ -141,10 +153,10 @@ public class ConfigScreen extends Screen {
         );
     }
 
-    public void add(AbstractWidget... widgets) {
+    public void addRow(AbstractWidget... widgets) {
         for (AbstractWidget widget : widgets) {
-            widget.setX((width / 2 - 155) + ((AbstractWidgetAccess)widget).particle_rain$getOffset());
+            widget.setX((width / 2 - 155) + ((AbstractWidgetAccess)widget).pigcart$getOffset());
         }
-        list.add(widgets);
+        list.addRow(widgets);
     }
 }

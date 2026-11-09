@@ -51,25 +51,34 @@ public abstract class SpriteLoaderMixin {
                 snowImage = TextureUtil.loadTexture(VersionUtil.getMcId("textures/environment/snow.png"));
                 TextureUtil.boostAlpha(rainImage, "rain");
                 TextureUtil.boostAlpha(snowImage, "snow");
-                if (ConfigManager.config.compat.waterTint) TextureUtil.desaturate(rainImage);
+                if (ConfigManager.getConfig().compat.waterTint) TextureUtil.desaturate(rainImage);
             } catch (IOException e) {
                 ParticleRain.LOGGER.error("Error loading weather textures: ", e);
             }
 
             // split both weather textures into four sprites
-            for (int i = 0; i < 4; i++) {
-                stitcher.registerSprite(TextureUtil.splitImage(rainImage, i, "rain_"));
+            for (int i = 0; i < 16; i++) {
+                stitcher.registerSprite(TextureUtil.getSpriteFromSheet(rainImage, "rain_", i, 2));
             }
-            for (int i = 0; i < 4; i++) {
-                stitcher.registerSprite(TextureUtil.splitImage(snowImage, i, "snow_"));
+            for (int i = 0; i < 16; i++) {
+                stitcher.registerSprite(TextureUtil.getSpriteFromSheet(snowImage, "snow_", i, 2));
             }
+            // generate heavy rain and snow textures
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(rainImage, "heavy_rain_0", 0, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(rainImage, "heavy_rain_1", 4, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(rainImage, "heavy_rain_2", 8, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(rainImage, "heavy_rain_3", 12, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(snowImage, "heavy_snow_0", 0, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(snowImage, "heavy_snow_1", 4, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(snowImage, "heavy_snow_2", 8, 4, 2));
+            stitcher.registerSprite(TextureUtil.mergeSpritesFromSheet(snowImage, "heavy_snow_3", 12, 4, 2));
             // generate ripple sprites
             int rippleResolution = TextureUtil.getRippleResolution(this.spriteContentsList);
             for (int i = 0; i < 8; i++) {
                 stitcher.registerSprite(TextureUtil.generateRipple(i, rippleResolution));
             }
             // create gray versions of the default splashes so tint can be applied
-            if (ConfigManager.config.compat.waterTint) {
+            if (ConfigManager.getConfig().compat.waterTint) {
                 for (int i = 0; i < 4; i++) {
                     try {
                         stitcher.registerSprite(VersionUtil.loadSplashSprite(i));

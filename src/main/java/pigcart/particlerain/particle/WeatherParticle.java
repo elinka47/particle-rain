@@ -2,7 +2,7 @@ package pigcart.particlerain.particle;
 
 //? if >= 1.21.9 {
 /*import net.minecraft.client.particle.SingleQuadParticle;
-import net.minecraft.client.renderer.state.QuadParticleRenderState;
+import net.minecraft.client.renderer.state./^?>=26.1{^//^level.^//^?}^/QuadParticleRenderState;
 *///?} else {
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.TextureSheetParticle;
@@ -14,25 +14,22 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import pigcart.particlerain.ParticleSpawner;
 import pigcart.particlerain.VersionUtil;
-import pigcart.particlerain.WeatherParticleManager;
-import pigcart.particlerain.config.ConfigData;
+import pigcart.particlerain.config.ParticleData;
 
-import static pigcart.particlerain.config.ConfigManager.config;
+import static pigcart.particlerain.config.ConfigManager.getConfig;
 
-//TODO
 public abstract class WeatherParticle extends /*? if >=1.21.9 {*/ /*SingleQuadParticle *//*?} else {*/TextureSheetParticle /*?}*/ {
 
     protected BlockPos.MutableBlockPos pos;
     protected BlockPos.MutableBlockPos oPos;
     boolean doCollisionAnim = false;
-    float baseTemp;
-    float targetOpacity;
     float oQuadSize;
-    float distance;
 
     protected WeatherParticle(ClientLevel level, double x, double y, double z, TextureAtlasSprite sprite) {
         super(level, x, y, z /*? if >=1.21.9 {*//*,sprite*//*?}*/);
@@ -41,17 +38,16 @@ public abstract class WeatherParticle extends /*? if >=1.21.9 {*/ /*SingleQuadPa
         this.hasPhysics = false;
 
         this.setSize(quadSize, quadSize);
-        this.lifetime = config.perf.particleDistance * 100;
+        this.lifetime = getConfig().perf.particleDistance * 100;
         this.pos = new BlockPos.MutableBlockPos(x, y, z);
         this.oPos = new BlockPos.MutableBlockPos(x, y, z);
-        this.baseTemp = level.getBiome(this.pos).value().getBaseTemperature();
 
-        WeatherParticleManager.particleCount++;
+        ParticleSpawner.particleCount++;
     }
 
     @Override
     public void remove() {
-        if (this.isAlive()) WeatherParticleManager.particleCount--;
+        if (this.isAlive()) ParticleSpawner.particleCount--;
         super.remove();
     }
 
@@ -61,41 +57,26 @@ public abstract class WeatherParticle extends /*? if >=1.21.9 {*/ /*SingleQuadPa
     *///?} else {
     public ParticleRenderType getRenderType() {
      //?}
-        return ConfigData.RenderType.TRANSLUCENT.get();
+        return ParticleData.RenderType.TRANSLUCENT.get();
     }
 
     @Override
     public void tick() {
         super.tick();
         oQuadSize = quadSize;
-        distance = (float) VersionUtil.camPos(Minecraft.getInstance().gameRenderer.getMainCamera()).distanceTo(new Vec3(x, y, z));
         pos.set(x, y, z);
-        if (!pos.equals(oPos)) {
-            onPositionUpdate();
-            oPos.set(pos);
-        }
         if (doCollisionAnim) {
             tickCollisionAnim();
         }
-        tickDistanceFade();
     }
 
-    public void onPositionUpdate() {
-        if (!config.compat.crossBiomeBorder && Mth.abs(level.getBiome(pos).value().getBaseTemperature() - baseTemp) > 0.4) {
-            doCollisionAnim = true;
-        }
-        if (level.getBlockState(pos).isCollisionShapeFullBlock(level, pos) || !level.getFluidState(pos).isEmpty()) {
-            this.remove();
-        }
-    }
-
-    public void tickDistanceFade() {
-        final float renderDistance = config.perf.particleDistance;
-        if (distance > renderDistance) {
-            remove();
-        } else {
-            alpha = Mth.lerp(distance / renderDistance, targetOpacity, 0);
-        }
+    @Override
+    public void move(double x, double y, double z) {
+        // Sable wraps this method to apply velocity from the intersecting sub-level
+        // easy fix is to just ignore it
+        this.x = this.x + this.xd;
+        this.y = this.y + this.yd;
+        this.z = this.z + this.zd;
     }
 
     @Override
@@ -103,11 +84,7 @@ public abstract class WeatherParticle extends /*? if >=1.21.9 {*/ /*SingleQuadPa
         return Mth.lerp(scaleFactor, oQuadSize, quadSize);
     }
 
-    public void tickCollisionAnim() {
-        float deltaMovement = (float) new Vec3(xd, yd, zd).length();
-        quadSize = quadSize - deltaMovement;
-        if (quadSize <= 0) remove();
-    }
+    public abstract void tickCollisionAnim();
 
     public Quaternionf turnBackfaceFlipways(Quaternionf quaternion, Vector3f cameraOffset) {
         Vector3f normal = new Vector3f(0, 0, 1);

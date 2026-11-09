@@ -2,10 +2,10 @@ plugins {
     id("net.neoforged.moddev")
 }
 
-val minecraft = property("deps.minecraft") as String;
+fun prop(name: String) = sc.properties[name]
+val minecraft = prop("deps.minecraft");
 
 tasks.named<ProcessResources>("processResources") {
-    fun prop(name: String) = project.property(name) as String
 
     val props = HashMap<String, String>().apply {
         this["mod_id"] =        prop("mod.id")
@@ -23,10 +23,6 @@ tasks.named<ProcessResources>("processResources") {
         // insert version-specific mixins
         this["RegistrySyncManagerMixin" ] = ""
         this["TextureSheetParticleMixin"] = if (sc.current.parsed  < "1.21.9") "\"tint.TextureSheetParticleMixin\"," else ""
-        this["DripParticleMixin"        ] = if (sc.current.parsed  < "1.21.9") "\"tint.DripParticleMixin\"," else ""
-        this["WaterFallProviderMixin"   ] = if (sc.current.parsed >= "1.21.9") "\"tint.WaterFallProviderMixin\"," else ""
-        this["WaterHangProviderMixin"   ] = if (sc.current.parsed >= "1.21.9") "\"tint.WaterHangProviderMixin\"," else ""
-        this["ParticleLimitMixin"       ] = if (sc.current.parsed >= "1.21.9") "\"ParticleLimitMixin\"," else ""
     }
 
     filesMatching(listOf("META-INF/neoforge.mods.toml", "${prop("mod.id")}.mixins.json")) {
@@ -34,25 +30,30 @@ tasks.named<ProcessResources>("processResources") {
     }
 }
 
-version = "${property("mod.version")}+${minecraft}-neoforge"
-base.archivesName = property("mod.id") as String
+version = "${prop("mod.version")}+${minecraft}-neoforge"
+base.archivesName = prop("mod.id")
 
 repositories {
     mavenLocal()
     maven("https://maven.neoforged.net/releases/")
     maven("https://maven.parchmentmc.org")
+    maven("https://api.modrinth.com/maven")
+}
+
+dependencies {
+    compileOnly("maven.modrinth:iris:${prop("deps.iris")}")
 }
 
 neoForge {
-    version = property("deps.neoforge") as String
+    version = prop("deps.neoforge")
 
     val accessTransformer = rootProject.file("src/main/resources/META-INF/accesstransformer.cfg")
     if (accessTransformer.exists()) {
         accessTransformers.from(accessTransformer.absolutePath)
     }
 
-    if (hasProperty("deps.parchment")) parchment {
-        val (mc, ver) = (property("deps.parchment") as String).split(':')
+    if (sc.properties.contains("deps.parchment")) parchment {
+        val (mc, ver) = prop("deps.parchment").split(':')
         mappingsVersion = ver
         minecraftVersion = mc
     }
@@ -69,7 +70,7 @@ neoForge {
     }
 
     mods {
-        register(property("mod.id") as String) {
+        register(prop("mod.id")) {
             sourceSet(sourceSets["main"])
         }
     }
@@ -87,7 +88,7 @@ tasks {
     register<Copy>("buildAndCollect") {
         group = "build"
         from(jar.map { it.archiveFile })
-        into(rootProject.layout.buildDirectory.file("libs/${project.property("mod.version")}"))
+        into(rootProject.layout.buildDirectory.file("libs/${prop("mod.version")}"))
         dependsOn("build")
     }
 }

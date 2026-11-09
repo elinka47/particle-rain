@@ -1,150 +1,83 @@
 package pigcart.particlerain.particle.render;
 
-//? if >=1.21.9 {
-/*import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DestFactor;
-import com.mojang.blaze3d.platform.SourceFactor;
+//? if >=26.3 {
+/*import com.mojang.renderpearl.api.pipeline.*;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.TextureAtlas;
+import pigcart.particlerain.VersionUtil;
 
 import static net.minecraft.client.renderer.RenderPipelines.PARTICLE_SNIPPET;
 
 public class BlendedParticleRenderType {
-    public static final BlendFunction FOG_BLEND = new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA);
-    public static final RenderPipeline FOG_PIPELINE = RenderPipelines.register(
+
+    public static final RenderPipeline BLENDED_PARTICLE = RenderPipelines.register(
             RenderPipeline.builder(PARTICLE_SNIPPET)
-                    .withLocation("pipeline/particlerain_fog")
-                    .withBlend(FOG_BLEND)
-                    .withDepthWrite(false).build()
+                    .withLocation(VersionUtil.getId("pipeline/particle_blended"))
+                    .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+                    .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN, false))
+                    .build()
     );
-    public static final SingleQuadParticle.Layer INSTANCE = new SingleQuadParticle.Layer(true, TextureAtlas.LOCATION_PARTICLES, FOG_PIPELINE);
+    public static final SingleQuadParticle.Layer INSTANCE =
+            new SingleQuadParticle.Layer(true, TextureAtlas.LOCATION_PARTICLES, BLENDED_PARTICLE, RenderPipelines.OIT_PARTICLE);
 }
-*///?} else if >=1.21.5 {
+*///?} else if >=1.21.9 {
 /*import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DestFactor;
-import com.mojang.blaze3d.platform.SourceFactor;
+import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.util.TriState;
+import pigcart.particlerain.VersionUtil;
 
 import static net.minecraft.client.renderer.RenderPipelines.PARTICLE_SNIPPET;
-import static net.minecraft.client.renderer.RenderStateShard.*;
 
-import net.minecraft.client.particle.ParticleRenderType;
-
-// there doesnt seem to be an iris-compatible way to do this in >=1.21.5 ?
 public class BlendedParticleRenderType {
-    public static final BlendFunction FOG_BLEND = new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA);
-    public static final RenderPipeline FOG_PIPELINE =
-            //? if neoforge {
-            /^// cant be bothered to figure out neo impl lmao. might just need an access transformer?
-            RenderPipelines.TRANSLUCENT_PARTICLE;
-            ^///?} else {
-            RenderPipelines.register(
+
+    public static final RenderPipeline BLENDED_PARTICLE = RenderPipelines.register(
             RenderPipeline.builder(PARTICLE_SNIPPET)
-                    .withLocation("pipeline/particlerain_fog")
-                    .withBlend(FOG_BLEND)
-                    .withDepthWrite(false).build()
-            );
-            //?}
-    private static final RenderType FOG = RenderType.create(
-            "particlerain_fog",
-            1536,
-            false,
-            false,
-            FOG_PIPELINE,
-            RenderType.CompositeState.builder()
-                    .setTextureState(new TextureStateShard(TextureAtlas.LOCATION_PARTICLES,
-                            //? if <1.21.6 {
-                                /^TriState.FALSE,
-                            ^///?}
-                            false))
-                    .setOutputState(PARTICLES_TARGET)
-                    .setLightmapState(LIGHTMAP)
-                    .createCompositeState(false)
+                    .withLocation(VersionUtil.getId("pipeline/particle_blended"))
+                    //? >=26.1 {
+                    /^.withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(
+                            BlendFunction.TRANSLUCENT))
+                    .withDepthStencilState(new com.mojang.blaze3d.pipeline.DepthStencilState(
+                            //~ if 26.1 'GREATER_THAN' -> 'LESS_THAN'
+                            com.mojang.blaze3d.platform.CompareOp.GREATER_THAN, false))
+                    ^///?} else {
+                    .withBlend(BlendFunction.TRANSLUCENT)
+                    .withDepthWrite(false)
+                    //?}
+                    .build()
     );
-    public static final ParticleRenderType INSTANCE = new ParticleRenderType("particlerain:fog", FOG);
+    public static final SingleQuadParticle.Layer INSTANCE =
+            new SingleQuadParticle.Layer(true, TextureAtlas.LOCATION_PARTICLES, BLENDED_PARTICLE);
 }
 
-*///?} else if 1.21.4 {
-/*import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.RenderStateShard;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.util.TriState;
-
-public class BlendedParticleRenderType {
-    private static final RenderType FOG = RenderType.create(
-            "particlerain:fog",
-            DefaultVertexFormat.PARTICLE,
-            VertexFormat.Mode.QUADS,
-            1536,
-            false,
-            false,
-            RenderType.CompositeState.builder()
-                    .setShaderState(RenderType.PARTICLE_SHADER)
-                    .setTextureState(new RenderStateShard.TextureStateShard(TextureAtlas.LOCATION_PARTICLES, TriState.FALSE, false))
-                    .setTransparencyState(new RenderStateShard.TransparencyStateShard(
-                            "custom_blend",
-                            () -> {
-                                RenderSystem.depthMask(false);
-                                RenderSystem.enableBlend();
-                                RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
-                            },
-                            () -> {
-                                RenderSystem.depthMask(true);
-                                RenderSystem.disableBlend();
-                            }
-                    ))
-                    .setLightmapState(RenderType.LIGHTMAP)
-                    .setOverlayState(RenderType.OVERLAY)
-                    .setWriteMaskState(new RenderStateShard.WriteMaskStateShard(true, false))
-                    .setOutputState(RenderType.PARTICLES_TARGET)
-                    .createCompositeState(false)
-    );
-
-    public static final ParticleRenderType INSTANCE = new ParticleRenderType(
-            "particlerain:fog",
-            FOG
-    );
-}
 *///?} else if 1.21.1 {
-/*import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
+/*import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
-import org.jetbrains.annotations.Nullable;
-import pigcart.particlerain.VersionUtil;
 
 public class BlendedParticleRenderType {
     public static final ParticleRenderType INSTANCE = new ParticleRenderType() {
         @Override
-        public @Nullable BufferBuilder begin(Tesselator tesselator, TextureManager textureManager) {
+        public BufferBuilder begin(Tesselator tesselator, TextureManager textureManager) {
+            Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
             RenderSystem.enableDepthTest();
             RenderSystem.depthMask(false);
-            RenderSystem.enableBlend();
-            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
             RenderSystem.setShaderTexture(0, TextureAtlas.LOCATION_PARTICLES);
-            RenderSystem.setShaderTexture(2, VersionUtil.getMcId("dynamic/light_map_1"));
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
             return tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
         }
     };
 }
 *///?} else if 1.20.1 {
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -152,26 +85,27 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
-import pigcart.particlerain.VersionUtil;
 
 public class BlendedParticleRenderType {
     public static final ParticleRenderType INSTANCE = new ParticleRenderType() {
         @Override
         public void begin(BufferBuilder bufferBuilder, TextureManager textureManager) {
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(false);
-            RenderSystem.enableBlend();
-            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+            Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer(); // fixes black texture on item pickup
+            RenderSystem.enableDepthTest(); // fixes xray flickering on item pickup
+            RenderSystem.depthMask(false); // controls whether particles are blended together or masked out
+
+            // identical to vanilla translucent particle
             RenderSystem.setShaderTexture(0, TextureAtlas.LOCATION_PARTICLES);
-            RenderSystem.setShaderTexture(2, VersionUtil.getMcId("dynamic/light_map_1"));
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
             bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
         }
         @Override
         public void end(Tesselator tessellator) {
             tessellator.end();
+            // reset state
             RenderSystem.disableBlend();
             RenderSystem.depthMask(true);
         }

@@ -9,248 +9,288 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.*;
 import org.joml.Math;
-import pigcart.particlerain.ParticleRain;
-import pigcart.particlerain.VersionUtil;
-import pigcart.particlerain.config.ConfigData;
 //? if > 1.20.1 {
 /*import pigcart.particlerain.mixin.access.SingleQuadParticleAccessor;
 *///?}
 //? if >=1.21.9 {
 /*import net.minecraft.client.particle.SingleQuadParticle;
-import net.minecraft.client.renderer.state.QuadParticleRenderState;
+import net.minecraft.client.renderer.state./^?>=26.1{^//^level.^//^?}^/QuadParticleRenderState;
+import net.minecraft.util.RandomSource;
 *///?} else {
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.particle.ParticleRenderType;
 //?}
 
-import java.util.Optional;
-import java.util.Set;
+import pigcart.particlerain.ParticleLoader;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import pigcart.particlerain.WindManager;
+import pigcart.particlerain.WindLinkCompat;
+import pigcart.particlerain.VersionUtil;
+import pigcart.particlerain.config.ParticleData;
 
-import static pigcart.particlerain.config.ConfigManager.config;
+import java.awt.*;
+import java.util.Set;
+import java.util.List;
+
+import static pigcart.particlerain.config.ConfigManager.getConfig;
 
 public class CustomParticle extends WeatherParticle {
 
-    private static final Set<String> usuallyUntintableSprites = Set.of("particlerain:rain_0", "particlerain:rain_1", "particlerain:rain_2", "particlerain:rain_3");
-    public ConfigData.ParticleData opts;
+    private static final Set<String> dontTintTheseWhenWaterTintDisabled = Set.of(
+            "particlerain:rain_0", "particlerain:rain_1", "particlerain:rain_2", "particlerain:rain_3",
+            "particlerain:rain_4", "particlerain:rain_5", "particlerain:rain_6", "particlerain:rain_7",
+            "particlerain:rain_8", "particlerain:rain_9", "particlerain:rain_10", "particlerain:rain_11",
+            "particlerain:rain_12", "particlerain:rain_13", "particlerain:rain_14", "particlerain:rain_15",
+            "particlerain:heavy_rain_0", "particlerain:heavy_rain_1","particlerain:heavy_rain_2", "particlerain:heavy_rain_3"
+    );
+    public ParticleData data;
     private float oCollisionAnimProgress = 1;
     private float collisionAnimProgress = 1;
-    private float speed = 0;
-    private final float rotationVariation;
-    boolean doCollisionAnim = false;
-    public BlockPos.MutableBlockPos pos;
-    protected BlockPos.MutableBlockPos oPos;
+    public float speed = 0;
+    float rotationVariation;
     BlockHitResult collision = null;
     float baseTemp;
-    float oQuadSize;
     float distance;
+    int maxEdgeBounces = 3;
+    float baseSize;
+    int edgeBounces = 0;
 
-    public CustomParticle(ClientLevel level, double x, double y, double z, ConfigData.ParticleData opts) {
-        super(level, x, y, z, VersionUtil.getSprite(VersionUtil.parseId(opts.spriteLocations.get(level.random.nextInt(opts.spriteLocations.size())))));
+    private static float sizeFor(ParticleData data) {
+        float lent = WindLinkCompat.spriteSizeFor(data.id);
+        return (lent > 0 ? lent : data.size) * WindLinkCompat.sizeScale(data.id);
+    }
 
-        this.gravity = opts.gravity;
-        this.yd = -gravity;
-        this.quadSize = opts.size;
+    private static TextureAtlasSprite pickSprite(ClientLevel level, ParticleData data) {
+        List<String> sprites = WindLinkCompat.spritesFor(data.id);
+        if (sprites == null) sprites = data.spriteLocations;
+        return VersionUtil.getSprite(VersionUtil.parseId(sprites.get(level.getRandom().nextInt(sprites.size()))));
+    }
+
+    public CustomParticle(ClientLevel level, double x, double y, double z, ParticleData data) {
+        super(level, x, y, z, pickSprite(level, data));
+
+        this.data = data;
+        this.gravity = data.gravity;
+        this.yd = (data.spawnPos.equals(ParticleData.SpawnPos.SKY)) ? -gravity : data.bounciness;
+        WindManager.applySpawnWind(this, data, level);
+        this.baseSize = sizeFor(data);
+        this.quadSize = baseSize;
         this.alpha = 0;
         this.hasPhysics = false;
-
-
         this.setSize(quadSize, quadSize);
-        this.lifetime = config.perf.particleDistance * 100;
+        this.lifetime = getConfig().perf.particleDistance * 100;
         this.pos = new BlockPos.MutableBlockPos(x, y, z);
         this.oPos = new BlockPos.MutableBlockPos(x, y, z);
         this.baseTemp = level.getBiome(this.pos).value().getBaseTemperature();
-
-        this.opts = opts;
-        this.lifetime = opts.lifetime;
-        this.rotationVariation = opts.rotationAmount * ((random.nextFloat() - 0.5F) * 2.0F);
-        if (opts.constantScreenSize) {
+        this.lifetime = data.lifetime;
+        this.rotationVariation = data.rotationAmount * ((random.nextFloat() - 0.5F) * 2.0F);
+        if (data.distanceScaling != 0) {
             this.quadSize = getDistanceSize();
         } else {
-            this.quadSize = opts.size;
+            this.quadSize = baseSize;
         }
-        if (!usuallyUntintableSprites.contains(this.sprite.contents().name().toString()) || config.compat.waterTint) {
-            opts.tintType.applyTint(this, level, this.pos, opts);
+        // when waterTint disabled rain texture uses original color and tint wont work correctly
+        if (getConfig().compat.waterTint || !dontTintTheseWhenWaterTintDisabled.contains(this.sprite.contents().name().toString())) {
+            data.tintType.applyTint(this, level, this.pos, data);
         }
+        if (data.rotationType == ParticleData.RotationType.HORIZONTAL) this.roll = Mth.HALF_PI * level.getRandom().nextInt(4);
+        this.oRoll = this.roll;
     }
 
     public void tick() {
         super.tick();
         oQuadSize = quadSize;
         distance = (float) VersionUtil.camPos(Minecraft.getInstance().gameRenderer.getMainCamera()).distanceTo(new Vec3(x, y, z));
-        pos.set(x, y, z);
+        if (distance > data.spawnPos.renderDistance() + 0.5) {
+            remove();
+        }
         if (!pos.equals(oPos)) {
             onPositionUpdate();
             oPos.set(pos);
         }
-        if (doCollisionAnim) {
-            tickCollisionAnim();
-        }
-        tickDistanceFade();
         speed = (float) new Vec3(xd, yd, zd).length();
-        if (opts.constantScreenSize && !doCollisionAnim) quadSize = getDistanceSize();
-        if (opts.rotationAmount != 0) {
+        tickFading();
+        if (data.distanceScaling != 0 && !doCollisionAnim) quadSize = getDistanceSize();
+        if (data.rotationAmount != 0) {
             oRoll = roll;
             roll += rotationVariation * speed;
         }
-        tickWind();
+        if (data.animateSprites) {
+            int i = (this.age - 1) % (data.spriteLocations.size() - 1);
+            String sprite = data.spriteLocations.get(i);
+            this.setSprite(VersionUtil.getSprite(VersionUtil.parseId(sprite)));
+        }
+        // reapply tint to fog particles if the fog color is changing with the weather
+        float rainLevel = level.getRainLevel(1);
+        if (data.tintType == ParticleData.TintType.FOG && rainLevel > 0 && rainLevel < 1) {
+            data.tintType.applyTint(this, level, pos, data);
+        }
+        WindManager.applyWind(this, data, level);
+        tickCollisions();
     }
 
-    public void tickDistanceFade() {
-        float renderDistance = config.perf.particleDistance;
-        if (distance > renderDistance + 1) {
-            remove();
+    public void tickFading() {
+        if (data.fadeType == ParticleData.FadeType.IN_AND_OUT) {
+            int halfLife = lifetime / 2;
+            this.alpha = (age < halfLife ? (float) age / (halfLife) : (float) (-age + lifetime) / halfLife) * data.opacity;
+        } else if (data.fadeType == ParticleData.FadeType.OUT) {
+            int halfLife = lifetime / 2;
+            this.alpha = (float) (-age + lifetime) / halfLife * data.opacity;
         } else {
-            alpha = Mth.lerp(Mth.clamp(distance / renderDistance, 0, 1), opts.opacity, 0);
+            float renderDistance = data.spawnPos.renderDistance();
+            int falloff = 3;
+            float falloffDist = renderDistance / falloff;
+            alpha = Mth.lerp(Mth.clamp(((distance + falloffDist) / falloffDist) - falloff, 0, 1), data.opacity, 0);
+        }
+        if (data.rotationType == ParticleData.RotationType.VERTICAL) {
+            float angle = getPitchAngleToCamera();
+            float newAlpha = -(Math.min(angle, QUARTER_PI) / QUARTER_PI) + 1;
+            alpha = Math.min(alpha, newAlpha);
+        } else if (data.rotationType == ParticleData.RotationType.HORIZONTAL) {
+            float angle = getPitchAngleToCamera();
+            float newAlpha = Math.min(angle, 0.4f) / 0.4f;
+            alpha = Math.min(alpha, newAlpha);
         }
     }
-
-    public void tickWind() {
-        float frequency = config.wind.gustFrequency;
-        float shift = ParticleRain.clientTicks * config.wind.modulationSpeed;
-        float variance = config.wind.strengthVariance;
-        float strength = config.wind.strength;
-        float multiplier = level.isThundering() ? opts.stormWindStrength : opts.windStrength;
-        if (config.wind.yLevelAdjustment) multiplier *= yLevelWindMultiplier(y);
-        this.xd = (((Mth.sin((float)x * frequency + shift) * variance) + variance + strength) * multiplier) + 0.001F;
-        this.zd = (((Mth.sin((float)z * frequency + shift) * variance) + variance + strength) * multiplier) + 0.001F;
-    }
-
-    public static float yLevelWindMultiplier(double y) {
-        int transitionStart = 50;
-        int transitionDistance = 40;
-        return (float) Mth.clamp((y - transitionStart) / transitionDistance, 0, 1);
+    private static final float QUARTER_PI = 0.7853982f;
+    private float getPitchAngleToCamera() {
+        Vec3 camPos = VersionUtil.camPos(Minecraft.getInstance().gameRenderer.getMainCamera());
+        float offsetX = (float) (this.x - camPos.x());
+        float offsetY = (float) (this.y - camPos.y());
+        float offsetZ = (float) (this.z - camPos.z());
+        float localZ = Vector2f.length(offsetX, offsetZ);
+        return Mth.abs(Math.atan2(offsetY, localZ));
     }
 
     public void onPositionUpdate() {
-        if (!config.compat.crossBiomeBorder && Mth.abs(level.getBiome(pos).value().getBaseTemperature() - baseTemp) > 0.4) {
+        if (!getConfig().compat.crossBiomeBorder
+                && level.getBiome(pos).value().getBaseTemperature() != baseTemp
+                && !data.precipitation.contains(VersionUtil.getPrecipitationAt(level, level.getBiome(pos), pos))
+        ) {
             doCollisionAnim = true;
+            return;
         }
-        if (level.getBlockState(pos).isCollisionShapeFullBlock(level, pos) || !level.getFluidState(pos).isEmpty()) {
-            this.remove();
+
+        BlockState state = level.getBlockState(pos);
+        boolean ignoresBlock = getConfig().compat.weatherIgnoreBlocks.contains(state.getBlockHolder());
+        boolean isInFluid = !level.getFluidState(pos).isEmpty();
+
+        if (!ignoresBlock || isInFluid) {
+            if (level.getBlockState(pos).isCollisionShapeFullBlock(level, pos)) {
+                this.remove();
+            }
         }
-        testForCollisions();
     }
 
-    public void testForCollisions() {
-        float length = quadSize;
-        if (opts.rotationType.equals(ConfigData.RotationType.RELATIVE_VELOCITY)) {
-            final Vec3 camD = Minecraft.getInstance().getCameraEntity().getDeltaMovement();
-            Vector3f deltaMotion = new Vector3f((float) (this.xd - camD.x), (float) (this.yd - camD.y), (float) (this.zd - camD.z));
-            length *= Mth.clamp(deltaMotion.lengthSquared(), 0.2F, 1.0F);
-        }
+    public void tickCollisions() {
+        Vec3 deltaMotion = new Vec3(xd, yd, zd);
+        float length = (float) (quadSize + deltaMotion.length());
         Vec3 quadCenterPos = new Vec3(x, y, z);
-        Vec3 quadEdgePos = new Vec3(xd, yd, zd).normalize().multiply(length, length, length).add(x, y, z);
+        Vec3 quadEdgePos = deltaMotion.normalize().multiply(length, length, length).add(x, y, z);
         final BlockHitResult hitResult = level.clip(VersionUtil.getClipContext(quadCenterPos, quadEdgePos));
         if (!hitResult.getType().equals(HitResult.Type.MISS) && !doCollisionAnim) {
+            onCollision(hitResult);
+        }
+    }
+
+    public void onCollision(BlockHitResult hitResult) {
+
+        BlockState state = level.getBlockState(hitResult.getBlockPos());
+        if(getConfig().compat.weatherIgnoreBlocks.contains(state.getBlockHolder())) {
+            return;
+        }
+
+        if (!state.getFluidState().isSource() && data.bounciness != 0) {
+            final Vector3f normal = hitResult.getDirection().step();
+            final float bounciness = data.bounciness * speed * 6;
+            if (normal.y == 0) {
+                if (edgeBounces++ >= maxEdgeBounces) doCollisionAnim = true; // prevents getting stuck
+                this.yd += 0.5 * bounciness; // always try to move up, mimics wind rising over a hill or obstacle
+            }
+            this.xd += normal.x * bounciness;
+            this.yd += normal.y * bounciness;
+            this.zd += normal.z * bounciness;
+        } else {
             collision = hitResult;
             doCollisionAnim = true;
         }
     }
 
     public void tickCollisionAnim() {
-        //TODO 
         oCollisionAnimProgress = collisionAnimProgress;
         collisionAnimProgress -= speed;
-        if (!opts.rotationType.equals(ConfigData.RotationType.RELATIVE_VELOCITY)) {
-            quadSize -= speed;
+        if (!data.rotationType.equals(ParticleData.RotationType.RELATIVE_VELOCITY)) {
+            quadSize = Math.max(quadSize - speed, 0);
         }
-        if (oCollisionAnimProgress <= 0) remove();
+        if (oCollisionAnimProgress <= 0) { remove(); }
     }
 
     public float getDistanceSize() {
-        if (Minecraft.getInstance().options.getCameraType().isFirstPerson() && Minecraft.getInstance().player.isScoping()) {
-            return distance * opts.size * 0.25F;
-        } else {
-            return distance * opts.size;
-        }
+        float scaledSize = baseSize * distance * data.distanceScaling;
+        float size = baseSize + scaledSize;
+        if (data.distanceScaling != 1) return size;
+        // distanceScaling 1 means the particle is always the same size on the screen. scaling by fov ensures that remains true.
+        float max = 70; // i prefer it to not trigger for sprint/speed. capping at 70 is... good enough. mostlys
+        float fov = Math.min(VersionUtil.getFOV(), max) / max;
+        return size * fov;
     }
 
     @Override
     //? if >=1.21.9 {
     /*public SingleQuadParticle.Layer getLayer() {
-        return opts.renderType.get();
+        return data.renderType.get();
     }
     *///?} else {
     public ParticleRenderType getRenderType() {
-        return opts.renderType.get();
+        return data.renderType.get();
     }
     //?}
 
     @Override
-    //? if >=1.21.9 {
-    /*public void extract(QuadParticleRenderState h, Camera camera, float tickPercent) {
-    *///?} else {
+    //~ if >=1.21.9 'render(VertexConsumer' -> 'extract(QuadParticleRenderState'
     public void render(VertexConsumer h, Camera camera, float tickPercent) {
-    //?}
-        opts.rotationType.render(h, camera, tickPercent, this);
+        data.rotationType.render(h, camera, tickPercent, this);
     }
 
-    public void renderLookingQuad(/*? if >=1.21.9 {*//*QuadParticleRenderState*//*?} else {*/VertexConsumer/*?}*/ h, Camera camera, float tickPercent) {
+    //~ if >=1.21.9 VertexConsumer -> QuadParticleRenderState {
+    public void renderVerticalQuad(VertexConsumer h, Camera camera, float tickPercent) {
         Vec3 camPos = VersionUtil.camPos(camera);
         float offsetX = (float) (Mth.lerp(tickPercent, this.xo, this.x) - camPos.x());
         float offsetY = (float) (Mth.lerp(tickPercent, this.yo, this.y) - camPos.y());
         float offsetZ = (float) (Mth.lerp(tickPercent, this.zo, this.z) - camPos.z());
 
-        Vector3f localPos = new Vector3f(offsetX, offsetY, offsetZ);
-        // rotate particle around y axis to face player
-        Quaternionf quaternion = Axis.YP.rotation(Math.atan2(offsetX, offsetZ) + Mth.PI);
-        // rotate particle by angle between y axis and camera location
-        float yAngle = Math.asin(offsetY / localPos.length());
-        quaternion.rotateX(yAngle);
-        quaternion.rotateZ(Math.atan2(offsetX, offsetZ));
-        // the z rotation doubles up on the -y axis instead of negating it like the positive axis. idk how to fix
-        // for now we remove them before it gets to look too weird
-        if (yAngle < -1) doCollisionAnim = true;
-
+        Quaternionf quaternion = new Quaternionf();
+        quaternion.rotateY(Math.atan2(offsetX, offsetZ));
         quaternion.rotateZ(Mth.lerp(tickPercent, this.oRoll, this.roll));
+        turnBackfaceFlipways(quaternion, new Vector3f(offsetX, offsetY, offsetZ));
         this.renderRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent);
     }
 
-    //FIXME: particle invisible when horizontal velocity is 0
-    public void renderRelativeVelocityQuad(/*? if >=1.21.9 {*//*QuadParticleRenderState*//*?} else {*/VertexConsumer/*?}*/ h, Camera camera, float tickPercent) {
-        Vec3 camPos = VersionUtil.camPos(camera);
-        float offsetX = (float) (Mth.lerp(tickPercent, this.xo, this.x) - camPos.x());
-        float offsetY = (float) (Mth.lerp(tickPercent, this.yo, this.y) - camPos.y());
-        float offsetZ = (float) (Mth.lerp(tickPercent, this.zo, this.z) - camPos.z());
-
-        // get velocity
+    public void renderRelativeVelocityQuad(VertexConsumer h, Camera camera, float tickPercent) {
         final Vec3 camD = Minecraft.getInstance().getCameraEntity().getDeltaMovement();
         Vector3f deltaMotion = new Vector3f((float) (this.xd - camD.x), (float) (this.yd - camD.y), (float) (this.zd - camD.z));
-        // calculate velocity angle
-        final float angle = Math.acos(new Vector3f(deltaMotion).normalize().y);
-        Vector3f axis = new Vector3f(-deltaMotion.z(), 0, deltaMotion.x()).normalize();
-        Quaternionf quaternion = new Quaternionf(new AxisAngle4f(-angle, axis));
-        // rotate to face camera
-        Vector3f transformedOffset = new Vector3f(offsetX, offsetY, offsetZ);
-        transformedOffset.rotateAxis(angle, axis.x, axis.y, axis.z);
-        quaternion.mul(Axis.YP.rotation(Math.atan2(transformedOffset.x, transformedOffset.z) + Mth.PI));
-        // decide particle length from speed or collision progress
-        float stretchFactor = Mth.clamp(deltaMotion.lengthSquared(), 0.25F, 1.0F);
-        if (doCollisionAnim) {
-            float collisionProg = Mth.lerp(tickPercent, oCollisionAnimProgress, collisionAnimProgress);
-            if (collisionProg < stretchFactor) stretchFactor = collisionProg;
-        }
-        // bung it in the oven
-        renderSquishyRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent, stretchFactor);
+        renderVelocityQuad(h, camera, tickPercent, deltaMotion);
     }
-    //FIXME: particle invisible when horizontal velocity is 0
-    public void renderWorldVelocityQuad(/*? if >=1.21.9 {*//*QuadParticleRenderState*//*?} else {*/VertexConsumer/*?}*/ h, Camera camera, float tickPercent) {
+
+    public void renderWorldVelocityQuad(VertexConsumer h, Camera camera, float tickPercent) {
+        Vector3f deltaMotion = new Vector3f((float) xd, (float) yd, (float) zd);
+        renderVelocityQuad(h, camera, tickPercent, deltaMotion);
+    }
+
+    public void renderVelocityQuad(VertexConsumer h, Camera camera, float tickPercent, Vector3f deltaMotion) {
         Vec3 camPos = VersionUtil.camPos(camera);
         float offsetX = (float) (Mth.lerp(tickPercent, this.xo, this.x) - camPos.x());
         float offsetY = (float) (Mth.lerp(tickPercent, this.yo, this.y) - camPos.y());
         float offsetZ = (float) (Mth.lerp(tickPercent, this.zo, this.z) - camPos.z());
-
-        // get velocity
-        Vector3f deltaMotion = new Vector3f((float) xd, (float) yd, (float) zd);
         // calculate velocity angle
-        final float angle = Math.acos(new Vector3f(deltaMotion).normalize().y);
-        Vector3f axis = new Vector3f(-deltaMotion.z(), 0, deltaMotion.x()).normalize();
+        final float angle = velocityAngle(deltaMotion);
+        Vector3f axis = velocityAxis(deltaMotion);
         Quaternionf quaternion = new Quaternionf(new AxisAngle4f(-angle, axis));
         // rotate to face camera
         Vector3f transformedOffset = new Vector3f(offsetX, offsetY, offsetZ);
@@ -266,7 +306,21 @@ public class CustomParticle extends WeatherParticle {
         renderSquishyRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent, stretchFactor);
     }
 
-    public void renderCameraCopyQuad(/*? if >=1.21.9 {*//*QuadParticleRenderState*//*?} else {*/VertexConsumer/*?}*/ h, Camera camera, float tickPercent) {
+    private static float velocityAngle(Vector3f velocity) {
+        Vector3f direction = new Vector3f(velocity);
+        float length = direction.lengthSquared();
+        if (Float.isFinite(length) && length > 1.0e-20F) direction.normalize();
+        else direction.set(0, -1, 0);
+        return Math.acos(java.lang.Math.max(-1, java.lang.Math.min(1, direction.y)));
+    }
+
+    private static Vector3f velocityAxis(Vector3f velocity) {
+        Vector3f axis = new Vector3f(-velocity.z(), 0, velocity.x());
+        float length = axis.lengthSquared();
+        return Float.isFinite(length) && length > 1.0e-20F ? axis.normalize() : axis.set(1, 0, 0);
+    }
+
+    public void renderCameraCopyQuad(VertexConsumer h, Camera camera, float tickPercent) {
         Vec3 camPos = VersionUtil.camPos(camera);
         float offsetX = (float) (Mth.lerp(tickPercent, this.xo, this.x) - camPos.x());
         float offsetY = (float) (Mth.lerp(tickPercent, this.yo, this.y) - camPos.y());
@@ -280,17 +334,22 @@ public class CustomParticle extends WeatherParticle {
         this.renderRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent);
     }
 
-    //? if >=1.21.9 {
-    /*public void renderRotatedQuad(QuadParticleRenderState h, Quaternionf quaternion, float offsetX, float offsetY, float offsetZ, float tickPercent) {
-        this.extractRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent);
-    }
-    *///?}
+    public void renderHorizontalQuad(VertexConsumer h, Camera camera, float tickPercent) {
+        Vec3 camPos = VersionUtil.camPos(camera);
+        float offsetX = (float) (Mth.lerp(tickPercent, this.xo, this.x) - camPos.x());
+        float offsetY = (float) (Mth.lerp(tickPercent, this.yo, this.y) - camPos.y());
+        float offsetZ = (float) (Mth.lerp(tickPercent, this.zo, this.z) - camPos.z());
 
-    private void renderSquishyRotatedQuad(/*? if >=1.21.9 {*//*QuadParticleRenderState*//*?} else {*/VertexConsumer/*?}*/ h, Quaternionf quaternion, float x, float y, float z, float tickPercent, float squish) {
+        Quaternionf quaternion = new Quaternionf(new AxisAngle4d(Mth.HALF_PI, -1, 0, 0));
+        if (roll != 0) quaternion.rotateZ(Mth.lerp(tickPercent, oRoll, roll));
+        turnBackfaceFlipways(quaternion, new Vector3f(offsetX, offsetY, offsetZ));
+        this.renderRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent);
+    }
+
+    private void renderSquishyRotatedQuad(VertexConsumer h, Quaternionf quaternion, float x, float y, float z, float tickPercent, float squish) {
         //? if >=1.21.9 {
         /*this.extractRotatedQuad(h, quaternion, x, y, z, tickPercent);
         // doesnt seem to be an easy way to dig into a particles size now.
-        // im thinking of instead using the perspective trick of rotating the particle such that it looks stretched without actually being so
         *///?} else {
         float size = this.getQuadSize(tickPercent);
         float u0 = this.getU0();
@@ -304,6 +363,13 @@ public class CustomParticle extends WeatherParticle {
         this.renderVertex(h, quaternion, x, y, z, -1.0F, -squish, size, u0, v1, color);
         //?}
     }
+    //~ }
+
+    //? if >=1.21.9 {
+    /*public void renderRotatedQuad(QuadParticleRenderState h, Quaternionf quaternion, float offsetX, float offsetY, float offsetZ, float tickPercent) {
+        this.extractRotatedQuad(h, quaternion, offsetX, offsetY, offsetZ, tickPercent);
+    }
+    *///?}
 
     //? if <1.21.9 {
     private void renderVertex(VertexConsumer buffer, Quaternionf quaternion, float x, float y, float z, float xOffset, float yOffset, float quadSize, float u, float v, int packedLight) {
@@ -317,19 +383,18 @@ public class CustomParticle extends WeatherParticle {
     }
     //?}
 
-    public static class DefaultFactory implements ParticleProvider<SimpleParticleType> {
-        ConfigData.ParticleData opts;
+    // TODO complex particle type provider
+    public static class Provider implements ParticleProvider<SimpleParticleType> {
+        ParticleData data;
 
-        public DefaultFactory(ConfigData.ParticleData opts) {
-            this.opts = opts;
+        public Provider(ParticleData data) {
+            this.data = data;
         }
 
         public Particle createParticle(SimpleParticleType parameters, ClientLevel level, double x, double y, double z, double velocityX, double velocityY, double velocityZ/*? if >=1.21.9 {*//*, RandomSource random*//*?}*/) {
             // grab latest particle options before spawning particle
-            for (ConfigData.ParticleData options : config.particles) {
-                if (opts.id.equals(options.id)) opts = options;
-            }
-            return new CustomParticle(level, x, y, z, opts);
+            data = ParticleLoader.particles.get(data.id);
+            return new CustomParticle(level, x, y, z, data);
         }
     }
 }

@@ -11,19 +11,26 @@ pluginManagement {
 }
 
 plugins {
-    id("dev.kikugie.stonecutter") version "0.8"
+    id("dev.kikugie.stonecutter") version "0.10-beta.3"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 stonecutter {
     create(rootProject) {
         fun mc(version: String, vararg loaders: String) = loaders
-            .forEach { version("$version-$it", version).buildscript = "build.$it.gradle.kts" }
+            .forEach {
+                if (it == "fabric" && sc.eval(version, ">=26.1")) {
+                    version("$version-$it", version).buildscript = "build.fabric-unobf.gradle.kts"
+                } else {
+                    version("$version-$it", version).buildscript = "build.$it.gradle.kts"
+                }
+            }
 
-        mc("1.21.11", "fabric")
+        mc("26.3",   "fabric")
+        mc("26.2",   "fabric")
+        mc("26.1",   "fabric")
+        mc("1.21.11","fabric")
         mc("1.21.9", "fabric")
-        mc("1.21.6", "fabric", "neoforge")
-        mc("1.21.5", "fabric", "neoforge")
-        mc("1.21.4", "fabric", "neoforge")
         mc("1.21.1", "fabric", "neoforge")
         mc("1.20.1", "fabric", "forge")
 

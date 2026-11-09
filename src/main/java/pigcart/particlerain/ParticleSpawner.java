@@ -1,0 +1,269 @@
+package pigcart.particlerain;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biome.Precipitation;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import pigcart.particlerain.config.ParticleData;
+import pigcart.particlerain.particle.StreakParticle;
+
+import static pigcart.particlerain.config.ConfigManager.getConfig;
+
+public final class ParticleSpawner {
+    private static final RandomSource RANDOM = RandomSource.create();
+    private static final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+    private static final BlockPos.MutableBlockPos heightmapPos = new BlockPos.MutableBlockPos();
+    public static int afterWeatherTicksLeft = 0;
+    public static int spawnAttemptsUntilBlockFXIdle = 0;
+    public static int ticksUntilSurfaceFXIdle = 0;
+    public static int ticksUntilSkyFXIdle = 0;
+    public static int particleCount = 0;
+
+    public static void tick(ClientLevel level, Vec3 cameraPos) {
+        if (particleCount >= getConfig().perf.particleAmount) return;
+        tickSkyFX(level, cameraPos);
+        tickSurfaceFX(level, cameraPos);
+        if (afterWeatherTicksLeft > 0) afterWeatherTicksLeft--;
+    }
+
+    public static void onWeatherChange(boolean isRaining) {
+        afterWeatherTicksLeft = isRaining ? 0 : RandomSource.create().nextInt(6000); // 'after weather' period lasts up to 5 minutes
+    }
+
+    public static boolean isIgnored(BlockState state) {
+        return getConfig().compat.weatherIgnoreBlocks.contains(state.getBlockHolder());
+    }
+
+    public static int calculateHeight(ClientLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
+        if(y == 0 || y == -1) y = VersionUtil.getMaxY(level); //Some servers (like wynncraft & hypixel) send a map of 0 or -1 for MOTION_BLOCKING;
+        BlockPos.MutableBlockPos heightPos = new BlockPos.MutableBlockPos(x, y, z);
+
+        while (y > VersionUtil.getMinY(level)) {
+            BlockState state = level.getBlockState(heightPos);
+
+            boolean noCollision = state.getCollisionShape(level, heightPos).isEmpty();
+            boolean nonFluid = state.getFluidState().isEmpty();
+
+            if (nonFluid && (noCollision || isIgnored(state))) {
+                y--;
+                heightPos.setY(y);
+            } else {
+                break;
+            }
+        }
+        return y + 1;
+    }
+
+    private static final Long2IntMap heightCache = new Long2IntOpenHashMap();
+    private static int lastTick = 0;
+
+    public static int getHeight(ClientLevel level, double x, double z) {
+        return getHeight(level, Mth.floor(x), Mth.floor(z)); // must floor for accurate negative block positions
+    }
+    public static int getHeight(ClientLevel level, int x, int z) {
+        if (getConfig().compat.weatherIgnoreBlocks.getEntries().isEmpty()) {
+            return level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
+        }
+
+        if (level.getGameTime() != lastTick) {
+            if (level.getGameTime() % 80 == 0) heightCache.clear();
+            lastTick = (int) level.getGameTime();
+        }
+        long key = ((long) x << 32) | (z & 0xFFFFFFFFL);
+
+        if (heightCache.containsKey(key)) {
+            return heightCache.get(key);
+        }
+
+        int customY = calculateHeight(level, x, z);
+        heightCache.put(key, customY);
+        return customY;
+    }
+
+    private static float density(ParticleData data) {
+        return data.density * WindLinkCompat.density(data.id);
+    }
+
+    public static void tickBlockFX(BlockPos.MutableBlockPos sourcePos, BlockState state, RandomSource random) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (spawnAttemptsUntilBlockFXIdle <= 0 && level.getRandom().nextFloat() < 0.9F) {
+            return;
+        }
+        spawnAttemptsUntilBlockFXIdle--;
+        if ( !state.getCollisionShape(level, sourcePos).isEmpty() && !isIgnored(state) ) return;
+        for (ParticleData data : ParticleLoader.particles.values()) {
+            if (!data.enabled || !data.weather.isCurrent(level)) continue;
+            final Holder<Biome> biome = level.getBiome(sourcePos);
+            final Direction direction = switch (data.spawnPos) {
+                case BLOCK_SIDES -> Direction.Plane.HORIZONTAL.getRandomDirection(random);
+                case BLOCK_BOTTOM -> Direction.DOWN;
+                case BLOCK_TOP -> Direction.UP;
+                default -> null;
+            };
+            if (direction == null) continue;
+            Direction opposite = direction.getOpposite();
+            pos.set(sourcePos.getX() + opposite.getStepX(), sourcePos.getY() + opposite.getStepY(), sourcePos.getZ() + opposite.getStepZ());
+            final BlockState blockState = level.getBlockState(pos);
+            final FluidState fluidState = blockState.getFluidState();
+            final VoxelShape collision = blockState.getCollisionShape(level, pos);
+            if ((collision.isEmpty() && fluidState.isEmpty()) || isIgnored(state) ) continue;
+            if ((data.spawnPos == ParticleData.SpawnPos.BLOCK_BOTTOM || data.spawnPos == ParticleData.SpawnPos.BLOCK_SIDES || data.spawnPos == ParticleData.SpawnPos.BLOCK_TOP)
+                    && data.precipitation.contains(VersionUtil.getPrecipitationAt(level, biome, sourcePos))
+                    && density(data) > random.nextFloat()
+                    && data.biomeList.contains(biome)
+                    && data.blockList.contains(level.getBlockState(pos).getBlockHolder())
+            ) {
+                if (data.needsSkyAccess && sourcePos.getY() < getHeight(level, sourcePos.getX(), sourcePos.getZ())    ) continue;
+                // get position on block face
+                float p1 = random.nextFloat();
+                float p2 = random.nextFloat();
+                Vector3f relativePos;
+                if (direction.getAxisDirection().equals(Direction.AxisDirection.POSITIVE)) {
+                    double max = collision.max(direction.getAxis(), p1, p2);
+                    if (direction == Direction.UP) {
+                        max = Math.max(max, fluidState.getHeight(level, pos));
+                    }
+                    if (max == Double.NEGATIVE_INFINITY) continue;
+                    max += 0.01; // avoid z-fighting
+                    //if (data.rotationType != ParticleData.RotationType.HORIZONTAL) max += data.size;
+                    relativePos = new Vector3f(p2 - 0.5F, (float) max - 0.5F, p1 - 0.5F);
+                } else {
+                    double min = collision.min(direction.getAxis(), p1, p2);
+                    if (min == Double.POSITIVE_INFINITY) continue;
+                    min -= 0.01;
+                    relativePos = new Vector3f(p2 - 0.5F, (float) min - 0.5F, p1 - 0.5F);
+                }
+                relativePos.rotate(switch (direction) {
+                    case UP, DOWN -> new Quaternionf();
+                    case SOUTH, NORTH -> new Quaternionf().rotationXYZ(Mth.HALF_PI, Mth.HALF_PI, 0);
+                    case EAST, WEST -> new Quaternionf().rotationXYZ(-Mth.HALF_PI, 0, -Mth.HALF_PI);
+                });
+                float x = pos.getX() + relativePos.x + 0.5F;
+                float y = pos.getY() + relativePos.y + 0.5F;
+                float z = pos.getZ() + relativePos.z + 0.5F;
+                if (data.particleStyle == ParticleData.ParticleStyle.REGISTERED && data.registeredParticleId.equals("particlerain:streak")) {
+                    // handle literal edge case. this mod's structure sucks sorry.
+                    Minecraft.getInstance().particleEngine.add(new StreakParticle(level, x, y, z, direction, data.blockList));
+                } else {
+                    data.particleStyle.spawn(level, x, y, z, data);
+                }
+                spawnAttemptsUntilBlockFXIdle = 10000;
+            }
+        }
+    }
+    public static int getSkyParticleDensity(ClientLevel level, float speed) {
+        int density = getConfig().perf.particleAmount / 25;
+        if (ticksUntilSkyFXIdle <= 0) {
+            density = 4;
+        } else {
+            ticksUntilSkyFXIdle--;
+            density = Mth.lerpInt(level.getThunderLevel(1), density, (int) (density * getConfig().perf.particleStormDensity));
+            // mul density by speed to maintain visual density
+            density *= 1 + (int) speed * 2;
+        }
+        return density;
+    }
+    public static void tickSkyFX(ClientLevel level, Vec3 cameraPos) {
+        float speed = (float) Minecraft.getInstance().getCameraEntity().getDeltaMovement().length();
+        int density = getSkyParticleDensity(level, speed);
+        for (int i = 0; i < density; i++) {
+            float height;
+            float x;
+            float y;
+            float z;
+            if (speed < 0.8) {
+                // use a center-weighted spawn pattern if moving slowly and limit it to top half of sphere
+                height = Mth.abs(Mth.square(RANDOM.nextFloat()) - Mth.square(RANDOM.nextFloat())) * -1 + 1;
+                height *= 0.4F + 0.6F;
+            } else {
+                // use the whole sphere if moving quickly (falling, flying)
+                height = RANDOM.nextFloat();
+            }
+            float theta = Mth.TWO_PI * RANDOM.nextFloat();
+            float phi = (float) Math.acos((2 * height) - 1);
+            x = getConfig().perf.particleDistance * Mth.sin(phi) * Mth.cos(theta) + (float) cameraPos.x;
+            y = getConfig().perf.particleDistance * Mth.cos(phi)                  + (float) cameraPos.y;
+            z = getConfig().perf.particleDistance * Mth.sin(phi) * Mth.sin(theta) + (float) cameraPos.z;
+            pos.set(x, y, z);
+            if (!level.isLoaded(pos)) continue;
+            if (getConfig().compat.doSpawnHeightLimit) {
+                int cloudHeight = getConfig().compat.spawnHeightLimit == 0 ? VersionUtil.getCloudHeight(level, pos) : getConfig().compat.spawnHeightLimit;
+                if (cloudHeight != 0 && y > cloudHeight) {
+                    y = cloudHeight;
+                    pos.setY(cloudHeight);
+                }
+            }
+            int heightmapY = getHeight(level, pos.getX(), pos.getZ());
+            heightmapPos.set(x, heightmapY - 1, z);
+            if (heightmapY >= pos.getY()) continue;
+            Holder<Biome> biome = level.getBiome(pos);
+            Precipitation precipitation = VersionUtil.getPrecipitationAt(level, biome, getConfig().compat.useHeightmapTemp ? heightmapPos : pos);
+            float spawnChance = RANDOM.nextFloat();
+
+            for (ParticleData data : ParticleLoader.particles.values()) {
+                if (data.enabled
+                    && data.spawnPos.equals(ParticleData.SpawnPos.SKY)
+                    && data.weather.isCurrent(level)
+                    && data.precipitation.contains(precipitation)
+                    && density(data) > spawnChance
+                    && data.biomeList.contains(biome)
+                    && data.blockList.contains(level.getBlockState(heightmapPos).getBlockHolder())
+                ) {
+                    data.particleStyle.spawn(level, x, y, z, data);
+                    ticksUntilSkyFXIdle = 100;
+                }
+            }
+        }
+    }
+
+    public static void tickSurfaceFX(ClientLevel level, Vec3 cameraPos) {
+        int density;
+        if (ticksUntilSurfaceFXIdle <= 0) {
+            density = 1;
+        } else {
+            density = getConfig().perf.particleAmount / 200;
+            ticksUntilSurfaceFXIdle--;
+        }
+        for (int i = 0; i < density; i++) {
+            double x = RANDOM.triangle(cameraPos.x, getConfig().perf.surfaceRange);
+            double z = RANDOM.triangle(cameraPos.z, getConfig().perf.surfaceRange);
+            double y = getHeight(level, x, z);
+
+            heightmapPos.set(x, y - 1, z);
+            if (!level.isLoaded(heightmapPos)) continue;
+            BlockState blockState = level.getBlockState(heightmapPos);
+            Holder<Biome> biome = level.getBiome(heightmapPos);
+            Biome.Precipitation precipitation = VersionUtil.getPrecipitationAt(level, biome, heightmapPos);
+            float spawnChance = RANDOM.nextFloat();
+
+            for (ParticleData data : ParticleLoader.particles.values()) {
+                if (data.enabled
+                        && density(data) > spawnChance
+                        && data.spawnPos.equals(ParticleData.SpawnPos.WORLD_SURFACE)
+                        && data.weather.isCurrent(level)
+                        && data.precipitation.contains(precipitation)
+                        && data.biomeList.contains(biome)
+                        && data.blockList.contains(blockState.getBlockHolder())
+                ) {
+                    data.particleStyle.spawn(level, x, y + RANDOM.nextDouble() + 0.1, z, data);
+                    ticksUntilSurfaceFXIdle = 100;
+                }
+            }
+        }
+    }
+}

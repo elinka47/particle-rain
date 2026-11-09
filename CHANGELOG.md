@@ -1,3 +1,191 @@
+### version scheme
+`overhaul.feature.hotfix`
+- **overhaul** number is increased when significant parts of code are replaced or introduced
+- **feature** number is increased when a new feature is added, and resets after an overhaul
+- **hotfix** number is increased when something minor is tweaked or a bug is fixed, and resets after a new feature
+
+this mimics the version scheme used by minecraft between 2011 and 2024 and aims to communicate changes about the mod without making promises regarding compatibility.
+
+### to-do:
+- sleet
+- hail
+- weather transitions
+- splash replacement - splatter
+- new streaks
+- rain refraction when shader pack enabled?
+
+# v4.0.4
+###### in progress
+Compatibility update part 2
+- fixed particles getting stuck on sable sub-levels
+- fixed collision animation playing twice as fast due to duplicate method call
+
+# v4.0.3
+###### Nov 4, 2026
+
+Compatibility update part 1: This version fixes issues affecting Iris, Ad Astra, and the arbitrary number of other mods that worsened texture corruption
+
+- added `/particlerain biometags` command and debug screen entry for biome tags (helpful for custom particle config)
+- optimized surface particle spawning (10x less spawn attempts)
+  - fixes a race condition where surface particle spawns outcompeted sky particle spawns, resulting in decreased rain density
+  - relative density values increased for all surface particles (shrubs, fog, and dust haze) to account for decreased spawn frquency (visual density is unchanged)
+- config changes
+  - percentage sliders no longer display fractional values as it is no longer required due to the above
+  - replaced 'density' and 'max particle amount' performance options with 'particle amount'
+  - replaced 'storm particle density' performance option with 'storm particle spawn multiplier'
+  - replaced 'render default weather' compatibility option with separate toggles for rain and snow
+- reversed wind direction because it going in the opposite direction to the clouds was silly
+- fog tint is now brighter when not raining and smoothly changes with the rain level
+- fixed transparency issue rendering fog and blended particles in minecraft 1.21.9 and up with iris shader packs due to using the wrong render pipeline
+- fixed wind sound and sandstorms appearing on the moon (and all other non overworld biomes)
+  - behaviour on forge may differ slightly as it does not have its own overworld tag and minecraft's is used instead
+- removed forge tags from fabric and neoforge builds
+- fixed corrupt rain and snow sprites from improper memory allocation during texture loading (ty LilleboHaugen)
+
+# v4.0.2
+###### Oct 9, 2026
+- fixed crash rendering fog/blended particles when improved transparency is enabled in minecraft 26.3
+- fixed fog/blended particles flickering when items are picked up in 1.20... again
+- fixed heightmap calculation fetching collision from wrong block position
+- fixed velocity particles becoming invisible without wind (ty CH4ACKO3)
+- fixed hardcoded heightmap level height causing rain under high structures on some servers
+
+# v4.0.1
+###### Oct 6, 2026
+- Fixed crash on load due to obscure accessor mapping error on pre-26.1 fabric
+
+# v4.0.0
+###### Oct 6, 2026
+
+dropping the beta tag since all particles (except streaks) are using the customization system now, which was the original point of this update (and multiver) before i did all that other stuff.
+
+- Added Minecraft 26.3 support
+
+
+- fixed particle count not decreasing when a particle spawn is canceled by the Particle Group
+- fixed blended particles being visible through objects in 26.1
+- fixed blended particle corrupt rendering regression from beta 1
+- fixed wind applying to particles with a wind strength of zero
+- fixed particles not appearing on forge due to missing convention tags
+- fixed haze effects breaking when viewed through spyglass or at low FOV (fix does not apply to zoom mods)
+- fixed surface effects spawning inside blocks at negative coordinates due to a rounding error
+- fixed storm weather particles spawning only when not stormy
+- fixed dripstone particles not tinting with water/rain color
+- fixed ripple texture resolution options not being visible
+- fixed rain appearing in unloaded chunks
+- fixed streaks floating over the edges of non-full blocks
+- fixed texture related config options reloading resource before the config screen closes
+- fixed `always` weather option
+- fixed config screen flickering on 26.1+
+- fixed particle config attempting to load the empty particle entries
+- fixed particle collisions not accounting for velocity
+- added random Y spawn offset to particles with surface spawn position
+- added fade types to particle config
+- added horizontal particle rotation type
+- added heavy snow and rain during thunderstorms
+- reduced distance fading falloff so particles are more visible at a distance
+- tweaked rain and snow texturing
+  - was previously split into 4 sprites, now is split into 16
+  - particle size reduced to fit the new texel density
+- ported mist and ripple effect to configurable horizontal particles
+- mist after rain no longer spawns in plains biomes (its too overwhelming i dont like it there)
+- tweaked spawn randomness such that particles with similar densities will spawn at the same time, allowing for composite effects (see horizontal & vertical fog)
+- replaced dust texture with vanilla generic dust texture
+- dust and shrubs can now spawn on coarse dirt
+- Wind Improvements (ty: plunderpixels)
+  - added WindLink compatibility, weather particles move with its wind when it is installed
+  - particles from vanilla or other mods now take wind, with the wind strength options shown for them
+  - snow can be drawn with WindLink's snowflake sprites, when its config asks for it
+  - WindLink can ask for more snow and rain, and for bigger flakes and drops
+
+overview of changes since v3.3.6:
+- multiversion support including support for forge loaders
+- customizable weather particles
+- built-in config and particle editor
+- resource packs can load their own weather effects
+- weather ignores barriers and other configurable blocks
+- various visual improvements to all effects including wind variance, distance fading, and new rotation styles
+- puddles removed and expanded into their own mod
+
+# v4 beta 11
+###### Aug 23, 2026
+- added mc 26.2 support
+- added a null check before accessing config (potentially fixing a loading issue on forge platforms)
+- added rolling block particles
+- raised config text input limit
+- fixed shrubs
+- fixed issues specific to mc 26.1 and above:
+  - fixed after weather period
+  - fixed mist not spawning (added `#minecraft:substrate_overworld` to mist blocks list)
+  - fixed blended particle alpha masking
+- fixed shrub spawn density not displaying correctly in config gui
+- fixed biome border particle culling removing particles between biomes with similar climates 
+- tweaked algorithm for the wind pattern
+- changed wind to apply cumulatively instead of overwriting particle velocity
+- updated Ukrainian and Russian translations (thanks: megatocha)
+- updated Korean translation (thanks: good7777865)
+- re-enabled dust haze by default because its cool as heck
+
+# v4 beta 10
+###### May 8, 2026
+- updated Simplified Chinese translation (thanks: Sasaki-Akari)
+- added option for weather to ignore specific blocks, passing through them instead of being obstructed (thanks: HigorFr)
+  - barriers, fences, and signs are ignored by default
+- removed incompatibilty warning for async particles
+- improved instructions on placeholder particle texture
+- added slight variance to map colored effects to improve effect visibility
+- re-added haze, disabled by default, improved dust haze
+- fixed non-functional underground spawn position option appearing in the config screen
+- fixed sky render distance being used for surface particles
+- fixed wrong collision size causing particles to clip through thin surfaces in mc`>1.21.9`
+- fixed particles inverting/inflating during collision animation
+- fixed incompatibility with some weather changing mods (thanks: HigorFr)
+- fixed particles spawning incorrectly on servers with modified heightmaps (thanks: HigorFr)
+
+# v4 beta 9
+###### Mar 29, 2026
+- fixed unreadable config inputs when CaramelChat is installed
+- fixed localization breaking decimal number inputs
+- readded tooltip descriptions to config entries
+- added display units to config entries
+
+# v4 beta 8
+###### Mar 25, 2026
+- fixed mod not loading on forge due to incorrect metadata
+- fixed heavy dust inflating at biome borders
+- fixed fog rendering incorrectly with iris
+- fixed random crash probably
+- improved water tint when shaders are used (can be disabled in config)
+- removed shrubs temporarily
+- removed support for minecraft 1.21.4, 1.21.5, 1.21.6
+
+# v4 beta 7
+###### Mar 24, 2026
+- added mc26.1 support
+- marked asyncparticles as explicitly incompatible
+
+# v4 beta 6
+###### Mar 7, 2026
+- new features
+  - Added a new default texture for custom particles
+  - Added heavy dust
+  - Added bounciness field to particle editor
+- squashed bugs
+  - Fixed weather appearing inside structures at the weather height limit
+  - Fixed resource packs failing to load when a weather texture is shorter than 1:4
+  - Fixed config number input fields not accepting negative values
+  - Fixed cycling buttons sometimes getting stuck
+  - Fixed crash when forge tries to load the mod on a server
+- tweaked particle loading and configuration
+  - split config into `particles.json` and `config.json`
+  - config files are now found at `config/particlerain/`
+  - particle loading now uses the resource pack system. resource packs can add new particles or customize existing ones by providing a file at `assets/particlerain/particles.json`
+  - particle configs no longer need to contain every value. omitted values will use the default values if no other loaded resource packs specify a value. multiple resource packs can configure the same particle.
+- various refactors, including:
+  - moved wind calculation to `ParticleRain.getWind(x, y, z)` for easier use by other mods
+- removed block sounds (out of scope)
+- removed haze effects to create a better default experience for those using shaderpacks or low-end hardware
+
 # v4 beta 5
 ###### Dec 26, 2025
 - Fixed crash using config gui on fabric due to missing accesswidener metadata
@@ -26,7 +214,7 @@
 - tweaked default config values
 
 # v4 beta 2
-###### Oct 03, 2025
+###### Oct 3, 2025
 - fixed crash when loading resource packs with invisible weather textures
 - fixed custom tints saving incorrectly and invalidating the config
 - fixed resource pack animated splash particles not loading correctly

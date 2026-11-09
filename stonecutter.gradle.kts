@@ -1,7 +1,8 @@
 plugins {
     id("dev.kikugie.stonecutter")
     id("co.uzzu.dotenv.gradle") version "4.0.0"
-    id("fabric-loom") version "1.13-SNAPSHOT" apply false
+    id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT" apply false
+    id("fabric-loom") version "1.18-SNAPSHOT" apply false
     id("net.neoforged.moddev") version "2.0.120" apply false
 }
 stonecutter active "1.20.1-fabric"
@@ -9,7 +10,26 @@ stonecutter active "1.20.1-fabric"
 stonecutter parameters {
     constants.match(node.metadata.project.substringAfterLast('-'), "fabric", "neoforge", "forge")
 
+    replacements.string(constants["forge"] == true) {
+        replace("#c:sandstone_blocks", "#forge:sandstone")
+        replace("#c:glass_panes", "#forge:glass_panes")
+        replace("#c:is_wet", "#forge:is_wet")
+        replace("#c:is_spooky", "#forge:is_spooky")
+        replace("#c:in_overworld", "#minecraft:is_overworld")
+        replace("\"c\",\"in_overworld\"", "\"minecraft\",\"is_overworld\"")
+    }
+    replacements.string(current.parsed >= "1.21.1") {
+        replace("#c:in_overworld", "#c:is_overworld")
+        replace("\"c\",\"in_overworld\"", "\"c\",\"is_overworld\"")
+    }
     replacements.string(current.parsed >= "1.21.11") {
         replace("ResourceLocation", "Identifier")
+    }
+    replacements.string(current.parsed >= "26.1") {
+        replace(".getBlockHolder()", ".typeHolder()")
+    }
+    replacements.string(current.parsed >= "26.2") {
+        replace("setScreen", "gui.setScreen")
+        replace("getMainCamera()", "mainCamera()")
     }
 }

@@ -12,8 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import org.joml.Math;
 import org.lwjgl.system.MemoryUtil;
-import pigcart.particlerain.config.ConfigData;
 import pigcart.particlerain.config.ConfigManager;
+import pigcart.particlerain.config.ParticleData;
 import pigcart.particlerain.mixin.access.NativeImageAccessor;
 
 import java.awt.*;
@@ -80,13 +80,8 @@ public class TextureUtil {
     }
 
     public static void applyWaterTint(SingleQuadParticle particle, ClientLevel level, BlockPos blockPos) {
-        for (ConfigData.ParticleData opts : ConfigManager.config.particles) {
-            if (opts.getClass().equals(ConfigData.ParticleData.class)) {
-                if (opts.id.equals("rain")) {
-                    opts.tintType.applyTint(particle, level, blockPos, opts);
-                }
-            }
-        }
+        final ParticleData rain = ParticleLoader.particles.get("rain");
+        rain.tintType.applyTint(particle, level, blockPos, rain);
     }
 
     public static NativeImage loadTexture(ResourceLocation location) throws IOException {
@@ -110,15 +105,64 @@ public class TextureUtil {
         return nativeImage;
     }
 
-    public static SpriteContents splitImage(NativeImage image, int segment, String id) {
-        int size = image.getWidth();
-        NativeImage sprite = new NativeImage(size, size, false);
-        image.copyRect(sprite, 0, size * segment, 0, 0, size, size, true, true);
-        return VersionUtil.newNonAnimatedSpriteContents(id + segment, new FrameSize(size, size), sprite);
+    ///  Splits one sprite from a vertical sprite sheet
+    public static SpriteContents getSpriteFromSheet(NativeImage spriteSheet, String id, int i, int columns) {
+        int size = spriteSheet.getWidth() / columns;
+        int rows = spriteSheet.getHeight() / size;
+        // check bounds
+        int max = rows * columns;
+        if (i >= max) throw new IndexOutOfBoundsException("Cannot get " + id + i + " as sheet only contains " + max + " sprites");
+        // create sprite
+        NativeImage sprite = new NativeImage(size, size, true);
+        int row = i % rows;
+        int col = i / rows;
+        try {
+            spriteSheet.copyRect(sprite, size * col, size * row, 0, 0, size, size, true, true);
+        } catch (Exception e) {
+            ParticleRain.LOGGER.error("Error splitting {} texture", id + i, e);
+        }
+        return VersionUtil.newNonAnimatedSpriteContents(id + i, new FrameSize(size, size), sprite);
+    }
+
+    ///  Merges a vertical sprite sheet into a single sprite by alpha
+    public static SpriteContents mergeSpritesFromSheet(NativeImage spriteSheet, String id, int startIndex, int spritesToMerge, int columns) {
+        int size = spriteSheet.getWidth() / columns;
+        int rows = spriteSheet.getHeight() / size;
+        int endIndex = startIndex + spritesToMerge;
+        // check bounds
+        int sheetSize = rows * columns;
+        if (endIndex > sheetSize) throw new IndexOutOfBoundsException("Cannot merge "+id+". Index "+endIndex+" out of bounds for sprite sheet of size "+sheetSize);
+        // create merged sprite
+        NativeImage sprite = new NativeImage(size, size, true);
+        for (int i = startIndex; i < endIndex; i++) {
+            int row = i % rows;
+            int col = i / rows;
+            try {
+                copyRectHighestAlpha(spriteSheet, sprite, size * col, size * row, 0, 0, size, size, true, true);
+            } catch (Exception e) {
+                ParticleRain.LOGGER.error("Error merging {} texture", id + i, e);
+            }
+        }
+        return VersionUtil.newNonAnimatedSpriteContents(id, new FrameSize(size, size), sprite);
+    }
+
+    ///  NativeImage.copyRect but pixels are only overwritten if they have a greater alpha value
+    public static void copyRectHighestAlpha(NativeImage source, NativeImage target, int sourceX, int sourceY, int targetX, int targetY, int sizeX, int sizeY, boolean swapX, boolean swapY) {
+        for(int y = 0; y < sizeY; ++y) {
+            for(int x = 0; x < sizeX; ++x) {
+                int dx = swapX ? sizeX - 1 - x : x;
+                int dy = swapY ? sizeY - 1 - y : y;
+                int src = getPixel(source, sourceX + x, sourceY + y);
+                int trg = getPixel(source, targetX + dx, targetY + dy);
+                int srcA = new Color(src, true).getAlpha();
+                int trgA = new Color(trg, true).getAlpha();
+                if (srcA > trgA) setPixel(target, targetX + dx, targetY + dy, src);
+            }
+        }
     }
 
     public static int getRippleResolution(List<SpriteContents> contents) {
-        if (ConfigManager.config.ripple.useResourcepackResolution) {
+        if (ConfigManager.getConfig().compat.rippleUsePackRes) {
             ResourceLocation resourceLocation = VersionUtil.getMcId("big_smoke_0");
             for (SpriteContents spriteContents : contents) {
                 if (spriteContents.name().equals(resourceLocation)) {
@@ -131,9 +175,9 @@ public class TextureUtil {
                 }
             }
         }
-        if (ConfigManager.config.ripple.resolution < 4) ConfigManager.config.ripple.resolution = 4;
-        if (ConfigManager.config.ripple.resolution > 256) ConfigManager.config.ripple.resolution = 256;
-        return ConfigManager.config.ripple.resolution;
+        if (ConfigManager.getConfig().compat.rippleRes < 4)   ConfigManager.getConfig().compat.rippleRes = 4;
+        if (ConfigManager.getConfig().compat.rippleRes > 256) ConfigManager.getConfig().compat.rippleRes = 256;
+        return ConfigManager.getConfig().compat.rippleRes;
     }
 
     public static SpriteContents generateRipple(int i, int size) {
@@ -167,24 +211,23 @@ public class TextureUtil {
     }
 
     static void drawCirclePixel(int xc, int yc, int x, int y, NativeImage img, int col){
-        //? if >1.21.1 {
-        /*img.setPixel(xc+x, yc+y, col);
-        img.setPixel(xc-x, yc+y, col);
-        img.setPixel(xc+x, yc-y, col);
-        img.setPixel(xc-x, yc-y, col);
-        img.setPixel(xc+y, yc+x, col);
-        img.setPixel(xc-y, yc+x, col);
-        img.setPixel(xc+y, yc-x, col);
-        img.setPixel(xc-y, yc-x, col);
-        *///?} else {
-        img.setPixelRGBA(xc+x, yc+y, col);
-        img.setPixelRGBA(xc-x, yc+y, col);
-        img.setPixelRGBA(xc+x, yc-y, col);
-        img.setPixelRGBA(xc-x, yc-y, col);
-        img.setPixelRGBA(xc+y, yc+x, col);
-        img.setPixelRGBA(xc-y, yc+x, col);
-        img.setPixelRGBA(xc+y, yc-x, col);
-        img.setPixelRGBA(xc-y, yc-x, col);
-        //?}
+        setPixel(img, xc+x, yc+y, col);
+        setPixel(img, xc-x, yc+y, col);
+        setPixel(img, xc+x, yc-y, col);
+        setPixel(img, xc-x, yc-y, col);
+        setPixel(img, xc+y, yc+x, col);
+        setPixel(img, xc-y, yc+x, col);
+        setPixel(img, xc+y, yc-x, col);
+        setPixel(img, xc-y, yc-x, col);
+    }
+
+    static void setPixel(NativeImage img, int x, int y, int col) {
+        //~ if >1.21.1 'setPixelRGBA' -> 'setPixel'
+        img.setPixelRGBA(x, y, col);
+    }
+
+    static int getPixel(NativeImage img, int x, int y) {
+        //~ if >1.21.1 'getPixelRGBA' -> 'getPixel'
+        return img.getPixelRGBA(x, y);
     }
 }

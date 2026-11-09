@@ -2,10 +2,10 @@ plugins {
     id("fabric-loom")
 }
 
-val minecraft = property("deps.minecraft") as String;
+fun prop(name: String) = sc.properties[name]
+val minecraft = prop("deps.minecraft");
 
 tasks.named<ProcessResources>("processResources") {
-    fun prop(name: String) = project.property(name) as String
 
     val props = HashMap<String, String>().apply {
         this["mod_id"] =        prop("mod.id")
@@ -23,10 +23,8 @@ tasks.named<ProcessResources>("processResources") {
         // insert version-specific mixins
         this["RegistrySyncManagerMixin" ] = if (sc.current.parsed  > "1.20.1") "\"fabric.RegistrySyncManagerMixin\"," else ""
         this["TextureSheetParticleMixin"] = if (sc.current.parsed  < "1.21.9") "\"tint.TextureSheetParticleMixin\"," else ""
-        this["DripParticleMixin"        ] = if (sc.current.parsed  < "1.21.9") "\"tint.DripParticleMixin\"," else ""
-        this["WaterFallProviderMixin"   ] = if (sc.current.parsed >= "1.21.9") "\"tint.WaterFallProviderMixin\"," else ""
-        this["WaterHangProviderMixin"   ] = if (sc.current.parsed >= "1.21.9") "\"tint.WaterHangProviderMixin\"," else ""
-        this["ParticleLimitMixin"       ] = if (sc.current.parsed >= "1.21.9") "\"ParticleLimitMixin\"," else ""
+
+        this["access_widener"] = "${prop("mod.id")}.accesswidener"
     }
 
     filesMatching(listOf("fabric.mod.json", "${prop("mod.id")}.mixins.json")) {
@@ -34,32 +32,34 @@ tasks.named<ProcessResources>("processResources") {
     }
 }
 
-version = "${property("mod.version")}+${minecraft}-fabric"
-base.archivesName = property("mod.id") as String
+version = "${prop("mod.version")}+${minecraft}-fabric"
+base.archivesName = prop("mod.id")
 
 repositories {
     mavenLocal()
     maven("https://maven.parchmentmc.org")
     maven("https://maven.terraformersmc.com/")
+    maven("https://api.modrinth.com/maven")
 }
 
 loom {
-    val accesswidener = rootProject.file("src/main/resources/${property("mod.id")}.accesswidener")
+    val accesswidener = rootProject.file("src/main/resources/${prop("mod.id")}.accesswidener")
     if (accesswidener.exists()) {
         accessWidenerPath = accesswidener
     }
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:${property("deps.minecraft")}")
+    minecraft("com.mojang:minecraft:${prop("deps.minecraft")}")
     mappings(loom.layered {
         officialMojangMappings()
-        if (hasProperty("deps.parchment"))
-            parchment("org.parchmentmc.data:parchment-${property("deps.parchment")}@zip")
+        if (sc.properties.contains("deps.parchment"))
+            parchment("org.parchmentmc.data:parchment-${prop("deps.parchment")}@zip")
     })
-    modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric-loader")}")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric-api")}")
-    modImplementation("com.terraformersmc:modmenu:${property("deps.modmenu")}")
+    modImplementation("net.fabricmc:fabric-loader:${prop("deps.fabric-loader")}")
+    modImplementation("net.fabricmc.fabric-api:fabric-api:${prop("deps.fabric-api")}")
+    modImplementation("com.terraformersmc:modmenu:${prop("deps.modmenu")}")
+    modCompileOnly("maven.modrinth:iris:${prop("deps.iris")}")
 }
 
 tasks {
@@ -70,7 +70,7 @@ tasks {
     register<Copy>("buildAndCollect") {
         group = "build"
         from(remapJar.map { it.archiveFile })
-        into(rootProject.layout.buildDirectory.file("libs/${project.property("mod.version")}"))
+        into(rootProject.layout.buildDirectory.file("libs/${prop("mod.version")}"))
         dependsOn("build")
     }
 }

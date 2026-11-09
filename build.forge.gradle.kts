@@ -2,10 +2,10 @@ plugins {
     id("net.neoforged.moddev.legacyforge")
 }
 
-val minecraft = property("deps.minecraft") as String;
+fun prop(name: String) = sc.properties[name]
+val minecraft = prop("deps.minecraft");
 
 tasks.named<ProcessResources>("processResources") {
-    fun prop(name: String) = project.property(name) as String
 
     val props = HashMap<String, String>().apply {
         this["mod_id"] =        prop("mod.id")
@@ -23,10 +23,6 @@ tasks.named<ProcessResources>("processResources") {
         // insert version-specific mixins
         this["RegistrySyncManagerMixin" ] = ""
         this["TextureSheetParticleMixin"] = "\"tint.TextureSheetParticleMixin\","
-        this["DripParticleMixin"        ] = "\"tint.DripParticleMixin\","
-        this["WaterFallProviderMixin"   ] = ""
-        this["WaterHangProviderMixin"   ] = ""
-        this["ParticleLimitMixin"       ] = ""
     }
 
     filesMatching(listOf("META-INF/mods.toml", "${prop("mod.id")}.mixins.json")) {
@@ -34,25 +30,26 @@ tasks.named<ProcessResources>("processResources") {
     }
 }
 
-version = "${property("mod.version")}+${minecraft}-forge"
-base.archivesName = property("mod.id") as String
+version = "${prop("mod.version")}+${minecraft}-forge"
+base.archivesName = prop("mod.id")
 
 repositories {
     mavenLocal()
     maven("https://maven.neoforged.net/releases/")
     maven("https://maven.parchmentmc.org")
+    maven("https://api.modrinth.com/maven")
 }
 
 legacyForge {
-    version = property("deps.forge") as String
+    version = prop("deps.forge")
 
     val accessTransformer = rootProject.file("src/main/resources/META-INF/accesstransformer.cfg")
     if (accessTransformer.exists()) {
         accessTransformers.from(accessTransformer)
     }
 
-    if (hasProperty("deps.parchment")) parchment {
-        val (mc, ver) = (property("deps.parchment") as String).split(':')
+    if (sc.properties.contains("deps.parchment")) parchment {
+        val (mc, ver) = prop("deps.parchment").split(':')
         mappingsVersion = ver
         minecraftVersion = mc
     }
@@ -69,21 +66,22 @@ legacyForge {
     }
 
     mods {
-        register(property("mod.id") as String) {
+        register(prop("mod.id")) {
             sourceSet(sourceSets["main"])
         }
     }
 }
 
 mixin {
-    add(sourceSets.main.get(), "${property("mod.id")}.refmap.json")
-    config("${property("mod.id")}.mixins.json")
+    add(sourceSets.main.get(), "${prop("mod.id")}.refmap.json")
+    config("${prop("mod.id")}.mixins.json")
 }
 
 dependencies {
     annotationProcessor("org.spongepowered:mixin:0.8.5:processor")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.0")!!)
     implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.5.0")) {}
+    compileOnly("maven.modrinth:iris:${prop("deps.iris")}")
 }
 
 tasks {
@@ -98,12 +96,12 @@ tasks {
     register<Copy>("buildAndCollect") {
         group = "build"
         from(jar.map { it.archiveFile })
-        into(rootProject.layout.buildDirectory.file("libs/${project.property("mod.version")}"))
+        into(rootProject.layout.buildDirectory.file("libs/${prop("mod.version")}"))
         dependsOn("build")
     }
 
     jar {
-        manifest.attributes["MixinConfigs"] = "${project.property("mod.id")}.mixins.json"
+        manifest.attributes["MixinConfigs"] = "${prop("mod.id")}.mixins.json"
     }
 }
 

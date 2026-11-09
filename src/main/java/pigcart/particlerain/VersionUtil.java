@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.ResourceLocationException;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -12,6 +13,7 @@ import net.minecraft.client.resources.metadata.animation.FrameSize;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -29,6 +31,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 *///?}
 //? >=1.21.9 {
 /*import net.minecraft.data.AtlasIds;
+import pigcart.particlerain.config.ParticleData;
 *///?} else {
 import pigcart.particlerain.mixin.access.ParticleEngineAccessor;
 //?}
@@ -41,12 +44,47 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 public class VersionUtil {
+
+    public static void hotbarMessage(Object o) {
+        hotbarMessage(Component.literal(String.valueOf(o)));
+    }
+    public static void hotbarMessage(Component component) {
+        //? >=26.2 {
+        /*Minecraft.getInstance().gui.hud.setOverlayMessage(component, false);
+         *///?} else {
+        Minecraft.getInstance().gui.setOverlayMessage(component, false);
+        //?}
+    }
+
+    public static boolean shadersEnabled() {
+        return irisLoaded() && net.irisshaders.iris.api.v0.IrisApi.getInstance().isShaderPackInUse();
+
+    }
+    public static boolean irisLoaded() {
+        return  //? forge {
+                /*net.minecraftforge.fml.ModList.get().isLoaded("oculus");
+                 *///?} else if neoforge {
+                /*net.neoforged.fml.ModList.get().isLoaded("iris");
+                 *///?} else {
+                net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("iris");
+                //?}
+    }
+    public static boolean windLinkLoaded() {
+        return  //? forge {
+                /*net.minecraftforge.fml.ModList.get().isLoaded("windlink");
+                 *///?} else if neoforge {
+                /*net.neoforged.fml.ModList.get().isLoaded("windlink");
+                 *///?} else {
+                net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("windlink");
+                //?}
+    }
+
     @SuppressWarnings("removal")
     public static ResourceLocation getId(String path) {
         //? if <=1.20.1 {
         return new ResourceLocation(ParticleRain.MOD_ID, path);
         //?} else {
-        /*return Identifier.fromNamespaceAndPath(ParticleRain.MOD_ID, path);
+        /*return ResourceLocation.fromNamespaceAndPath(ParticleRain.MOD_ID, path);
         *///?}
     }
     @SuppressWarnings("removal")
@@ -54,7 +92,15 @@ public class VersionUtil {
         //? if <=1.20.1 {
         return new ResourceLocation(ResourceLocation.DEFAULT_NAMESPACE, path);
         //?} else {
-        /*return Identifier.withDefaultNamespace(path);
+        /*return ResourceLocation.withDefaultNamespace(path);
+        *///?}
+    }
+    @SuppressWarnings("removal")
+    public static ResourceLocation getId(String namespace, String path) {
+        //? if <=1.20.1 {
+        return new ResourceLocation(namespace, path);
+         //?} else {
+        /*return ResourceLocation.fromNamespaceAndPath(namespace, path);
         *///?}
     }
 
@@ -63,7 +109,7 @@ public class VersionUtil {
             //? if <=1.20.1 {
             return ResourceLocation.tryParse(string);
              //?} else {
-            /*return Identifier.parse(string);
+            /*return ResourceLocation.parse(string);
             *///?}
         } catch (ResourceLocationException e) {
             return null;
@@ -100,7 +146,7 @@ public class VersionUtil {
     }
     //?} else {
     /*public static SpriteContents loadSplashSprite(int i) throws IOException {
-        final Identifier location = getMcId("textures/particle/splash_" + i + ".png");
+        final ResourceLocation location = getMcId("textures/particle/splash_" + i + ".png");
         Resource resource = Minecraft.getInstance().getResourceManager().getResourceOrThrow(location);
         ResourceMetadata resourceMetadata = resource.metadata();
         NativeImage splashImage = TextureUtil.loadTexture(resource);
@@ -182,10 +228,26 @@ public class VersionUtil {
         //?}
     }
 
+    public static int getMaxY(Level level) {
+        //? if >=1.21.9 {
+        /*return level.getMaxY();
+        *///?} else {
+        return 255;
+        //?}
+    }
+
+    public static int getMinY(Level level) {
+        //? if >=1.21.9 {
+        /*return level.getMinY();
+        *///?} else {
+        return -64;
+        //?}
+    }
+
     public static TextureAtlasSprite getSprite(ResourceLocation id) {
         //? if >= 1.21.9 {
         /*return Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.PARTICLES).getSprite(id);
-         *///?} else {
+        *///?} else {
         return ((ParticleEngineAccessor) Minecraft.getInstance().particleEngine).getTextureAtlas().getSprite(id);
         //?}
     }
@@ -198,8 +260,22 @@ public class VersionUtil {
         //?}
     }
 
+    public static float getFOV() {
+        Options options = Minecraft.getInstance().options;
+        float fov = options.fov().get();
+        //? >=1.21.9 {
+        /*boolean firstPerson = options.getCameraType().isFirstPerson();
+        float effectScale = options.fovEffectScale().get().floatValue();
+        return fov * Minecraft.getInstance().player.getFieldOfViewModifier(firstPerson, effectScale);
+        *///?} else {
+        return fov * Minecraft.getInstance().player.getFieldOfViewModifier();
+        //?}
+    }
+
     public static void openUri(URI uri) {
-        //? >=1.21.11 {
+        //? >= 26.3 {
+        /*com.mojang.blaze3d.Blaze3D.openUri(uri);
+        *///?} >=1.21.11 {
         /*net.minecraft.util.Util.getPlatform().openUri(uri);
         *///?} else {
         net.minecraft.Util.getPlatform().openUri(uri);
@@ -222,13 +298,30 @@ public class VersionUtil {
          //?}
     }
 
-    public static Color getFogColor(Level level, BlockPos pos) {
+    public static Color getBiomeFogColor(Level level, BlockPos pos) {
         //? >=1.21.11 {
-        /*return new Color(12112639);
+        /*return new Color(0xB9D3FB);
         // environment values change dramatically at night. looks weird on particles. idk how to target only the day value.
         //return new Color(level.environmentAttributes().getValue(EnvironmentAttributes.FOG_COLOR, pos));
         *///?} else {
         return new Color(level.getBiome(pos).value().getFogColor());
          //?}
+    }
+
+    static void addChatMsg(String message) {
+        //? >=26.2 {
+        /*Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(Component.literal(message));
+         *///?} >=26.1 {
+        /*Minecraft.getInstance().gui.getChat().addClientSystemMessage(Component.literal(message));
+         *///?} else {
+        Minecraft.getInstance().gui.getChat().addMessage(Component.literal(message));
+        //?}
+    }
+
+    public static boolean isRaining(Level level) {
+        return level.getRainLevel(1) > 0;
+    }
+    public static boolean isThundering(Level level) {
+        return level.getThunderLevel(1) > 0;
     }
 }
